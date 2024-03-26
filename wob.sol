@@ -175,12 +175,24 @@ interface IERC20Detailed {
     function decimals() external view returns (uint8 _decimals);
 }
 
+interface IBlastPoints {
+    function configurePointsOperator(address operator) external;
+
+    function configurePointsOperatorOnBehalf(
+        address contractAddress,
+        address operator
+    ) external;
+}
+
 contract WorldOfBlas is ERC20, IERC20Detailed {
     string public name;
     string public symbol;
     uint8 public decimals;
     address payable public owner;
     uint256 private seed;
+    address public pointsOperator;
+
+    IBlastPoints public blastPointsContract;
 
     constructor() {
         string memory _name = "World Of Blast";
@@ -195,6 +207,29 @@ contract WorldOfBlas is ERC20, IERC20Detailed {
         decimals = _decimals;
         owner = payable(msg.sender);
         seed = uint256(keccak256(abi.encodePacked(block.timestamp)));
+
+        blastPointsContract = IBlastPoints(msg.sender);
+    }
+
+    function configurePointsOperator(address _operator) public {
+        require(
+            msg.sender == owner,
+            "Only the owner can set the points operator."
+        );
+
+        blastPointsContract.configurePointsOperator(_operator);
+    }
+
+    function updatePointsOperator(address _newOperator) public {
+        require(
+            msg.sender == pointsOperator,
+            "Only the current operator can update."
+        );
+        blastPointsContract.configurePointsOperatorOnBehalf(
+            address(this),
+            _newOperator
+        );
+        pointsOperator = _newOperator;
     }
 
     struct Vote {
