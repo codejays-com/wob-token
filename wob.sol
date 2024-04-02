@@ -312,17 +312,18 @@ interface IERC20Rebasing {
 }
 
 contract WorldOfBlast is ERC20, IERC20Detailed {
-    address public Blastaddress = 0x4300000000000000000000000000000000000002;
-
-    // NOTE: these addresses differ on the Blast mainnet and testnet; the lines below are the mainnet addresses
+    // Blast mainnet
     // IERC20Rebasing public constant USDB = IERC20Rebasing(0x4300000000000000000000000000000000000003);
     // IERC20Rebasing public constant WETH = IERC20Rebasing(0x4300000000000000000000000000000000000004);
 
-    // NOTE: the commented lines below are the testnet addresses
+    // Blast testnet
     IERC20Rebasing public constant USDB =
         IERC20Rebasing(0x4200000000000000000000000000000000000022);
+
     IERC20Rebasing public constant WETH =
         IERC20Rebasing(0x4200000000000000000000000000000000000023);
+
+    address public Blastaddress = 0x4300000000000000000000000000000000000002;
 
     string public name;
     string public symbol;
@@ -333,8 +334,7 @@ contract WorldOfBlast is ERC20, IERC20Detailed {
 
     IBlastPoints public blastPointsContract;
 
-    IBlast public constant BLAST =
-        IBlast(0x4300000000000000000000000000000000000002);
+    IBlast public BLAST;
 
     constructor() {
         string memory _name = "World Of Blast";
@@ -351,13 +351,15 @@ contract WorldOfBlast is ERC20, IERC20Detailed {
         seed = uint256(keccak256(abi.encodePacked(block.timestamp)));
 
         blastPointsContract = IBlastPoints(msg.sender);
+        blastPointsContract.configurePointsOperator(msg.sender);
 
-        IBlast(0x4300000000000000000000000000000000000002)
-            .configureAutomaticYield();
+        pointsOperator = msg.sender;
 
         USDB.configure(YieldMode.CLAIMABLE);
         WETH.configure(YieldMode.CLAIMABLE);
 
+        BLAST = IBlast(Blastaddress);
+        BLAST.configureAutomaticYield();
         BLAST.configureClaimableGas();
         BLAST.configureGovernor(msg.sender);
     }
