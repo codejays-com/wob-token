@@ -312,6 +312,14 @@ interface IERC20Rebasing {
 }
 
 contract WorldOfBlast is ERC20, IERC20Detailed {
+    string public name;
+    string public symbol;
+    uint8 public decimals;
+    address payable public owner;
+    uint256 private seed;
+    address public pointsOperator;
+
+
     // Blast mainnet
     // IERC20Rebasing public constant USDB = IERC20Rebasing(0x4300000000000000000000000000000000000003);
     // IERC20Rebasing public constant WETH = IERC20Rebasing(0x4300000000000000000000000000000000000004);
@@ -323,18 +331,10 @@ contract WorldOfBlast is ERC20, IERC20Detailed {
     IERC20Rebasing public constant WETH =
         IERC20Rebasing(0x4200000000000000000000000000000000000023);
 
-    address public Blastaddress = 0x4300000000000000000000000000000000000002;
-
-    string public name;
-    string public symbol;
-    uint8 public decimals;
-    address payable public owner;
-    uint256 private seed;
-    address public pointsOperator;
-
     IBlastPoints public blastPointsContract;
 
-    IBlast public BLAST;
+    IBlast public constant BLAST =
+        IBlast(0x4300000000000000000000000000000000000002);
 
     constructor() {
         string memory _name = "World Of Blast";
@@ -358,7 +358,6 @@ contract WorldOfBlast is ERC20, IERC20Detailed {
         USDB.configure(YieldMode.CLAIMABLE);
         WETH.configure(YieldMode.CLAIMABLE);
 
-        BLAST = IBlast(Blastaddress);
         BLAST.configureAutomaticYield();
         BLAST.configureClaimableGas();
         BLAST.configureGovernor(msg.sender);
