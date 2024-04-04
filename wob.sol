@@ -322,20 +322,8 @@ contract WorldOfBlast is ERC20, IERC20Detailed {
     string public symbol;
     uint8 public decimals;
     address payable public owner;
-    address public pointsOperator;
     address private _operator;
-
-    // Blast mainnet
-    // IERC20Rebasing public constant USDB = IERC20Rebasing(0x4300000000000000000000000000000000000003);
-    // IERC20Rebasing public constant WETH = IERC20Rebasing(0x4300000000000000000000000000000000000004);
-
-    modifier onlyOperator() {
-        require(
-            _operator == msg.sender,
-            "operator: caller is not the operator"
-        );
-        _;
-    }
+    address public pointsOperator;
 
     mapping(address => bool) public minters;
 
@@ -343,6 +331,11 @@ contract WorldOfBlast is ERC20, IERC20Detailed {
         address indexed previousOperator,
         address indexed newOperator
     );
+
+    //BlastPoints Testnet: 0x2fc95838c71e76ec69ff817983BFf17c710F34E0
+    //BlastPoints Mainnet: 0x2536FE9ab3F511540F2f9e2eC2A805005C3Dd800
+    address constant blastPointsAddress =
+        0x2fc95838c71e76ec69ff817983BFf17c710F34E0;
 
     // Blast mainnet
     // IERC20Rebasing public constant USDB = IERC20Rebasing(0x4300000000000000000000000000000000000003);
@@ -370,7 +363,7 @@ contract WorldOfBlast is ERC20, IERC20Detailed {
         decimals = _decimals;
         owner = payable(msg.sender);
         _operator = msg.sender;
-
+        pointsOperator = msg.sender;
         minters[msg.sender] = true;
 
         IBlast(BLAST_CONTRACT).configureAutomaticYield();
@@ -381,46 +374,58 @@ contract WorldOfBlast is ERC20, IERC20Detailed {
         USDB.configure(IERC20Rebasing.YieldMode.CLAIMABLE);
         WETH.configure(IERC20Rebasing.YieldMode.CLAIMABLE);
 
+        IBlastPoints(blastPointsAddress).configurePointsOperator(
+            pointsOperator
+        );
+
         emit OperatorTransferred(address(0), _operator);
 
         emit Transfer(address(0), msg.sender, totalSupply);
     }
 
-    modifier onlyMinter() {
-        require(minters[msg.sender] == true, "Only minters allowed");
-        _;
-    }
-
     /*********************** BLAST RELATED ***********************/
+
+    function setNewPointsOperator(address contractAddress, address newOperator)
+        external
+    {
+        require(msg.sender == owner, "Only the owner.");
+        pointsOperator = newOperator;
+        IBlastPoints(blastPointsAddress).configurePointsOperatorOnBehalf(
+            contractAddress,
+            newOperator
+        );
+    }
 
     function configureYieldModeTokens(
         IERC20Rebasing.YieldMode _weth,
         IERC20Rebasing.YieldMode _usdb
-    ) external onlyOperator {
+    ) external {
+        require(msg.sender == _operator, "Only the owner.");
         USDB.configure(_usdb);
         WETH.configure(_weth);
     }
 
-    function claimYieldTokens(address recipient, uint256 amount)
-        external
-        onlyOperator
-    {
+    function claimYieldTokens(address recipient, uint256 amount) external {
+        require(msg.sender == _operator, "Only the owner.");
         USDB.claim(recipient, amount);
         WETH.claim(recipient, amount);
     }
 
-    function claimYield(address recipient, uint256 amount)
-        external
-        onlyOperator
-    {
+    function claimYield(address recipient, uint256 amount) external {
+        require(msg.sender == _operator, "Only the owner.");
         IBlast(BLAST_CONTRACT).claimYield(address(this), recipient, amount);
     }
 
-    function claimAllYield(address recipient) external onlyOperator {
+    function claimAllYield(address recipient) external {
+        require(msg.sender == _operator, "Only the owner.");
         IBlast(BLAST_CONTRACT).claimAllYield(address(this), recipient);
     }
 
-    function claimMyContractsGas() external onlyOperator {
+    function claimMyContractsGas() external {
+        require(
+            msg.sender == _operator,
+            "Only the owner can configure governor."
+        );
         IBlast(BLAST_CONTRACT).claimAllGas(address(this), msg.sender);
     }
 
@@ -429,6 +434,7 @@ contract WorldOfBlast is ERC20, IERC20Detailed {
         address contractAddress
     ) public {
         require(msg.sender == owner, "Only the owner can configure governor.");
+        _operator = _newGovernor;
         IBlast(BLAST_CONTRACT).configureGovernorOnBehalf(
             _newGovernor,
             contractAddress
@@ -441,10 +447,7 @@ contract WorldOfBlast is ERC20, IERC20Detailed {
         address recipientOfGas,
         uint256 minClaimRateBips
     ) external returns (uint256) {
-        require(
-            msg.sender == owner,
-            "Only the owner can claim gas at min claim rate."
-        );
+        require(msg.sender == _operator, "Only the owner.");
         return
             IBlast(BLAST_CONTRACT).claimGasAtMinClaimRate(
                 contractAddress,
@@ -457,7 +460,7 @@ contract WorldOfBlast is ERC20, IERC20Detailed {
         external
         returns (uint256)
     {
-        require(msg.sender == owner, "Only the owner can claim max gas.");
+        require(msg.sender == _operator, "Only the owner can claim max gas.");
         return
             IBlast(BLAST_CONTRACT).claimMaxGas(contractAddress, recipientOfGas);
     }
