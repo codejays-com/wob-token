@@ -330,24 +330,25 @@ contract WorldOfBlast is ERC20, IERC20Detailed {
         address indexed newOperator
     );
 
-    //BlastPoints Testnet: 0x2fc95838c71e76ec69ff817983BFf17c710F34E0
-    //BlastPoints Mainnet: 0x2536FE9ab3F511540F2f9e2eC2A805005C3Dd800
-    address constant blastPointsAddress =
+    address public constant BLAST_CONTRACT =
+        0x4300000000000000000000000000000000000002;
+
+    /*********************** BLAST MAINNET ***********************/
+    /**
+    address public constant blastPointsAddress = 0x2536FE9ab3F511540F2f9e2eC2A805005C3Dd800;
+    IERC20Rebasing public constant USDB = IERC20Rebasing(0x4300000000000000000000000000000000000003);
+    IERC20Rebasing public constant WETH = IERC20Rebasing(0x4300000000000000000000000000000000000004);
+    **/
+
+    /*********************** BLAST TESTNET ***********************/
+    address public constant blastPointsAddress =
         0x2fc95838c71e76ec69ff817983BFf17c710F34E0;
 
-    // Blast mainnet
-    // IERC20Rebasing public constant USDB = IERC20Rebasing(0x4300000000000000000000000000000000000003);
-    // IERC20Rebasing public constant WETH = IERC20Rebasing(0x4300000000000000000000000000000000000004);
-
-    // Blast testnet
     IERC20Rebasing public constant USDB =
         IERC20Rebasing(0x4200000000000000000000000000000000000022);
 
     IERC20Rebasing public constant WETH =
         IERC20Rebasing(0x4200000000000000000000000000000000000023);
-
-    address public constant BLAST_CONTRACT =
-        0x4300000000000000000000000000000000000002;
 
     constructor() {
         string memory _name = "World Of Blast";
@@ -381,7 +382,7 @@ contract WorldOfBlast is ERC20, IERC20Detailed {
         emit Transfer(address(0), msg.sender, totalSupply);
     }
 
-    /*********************** BLAST RELATED ***********************/
+    /*********************** BLAST ***********************/
 
     function setNewPointsOperator(address contractAddress, address newOperator)
         external
@@ -417,14 +418,6 @@ contract WorldOfBlast is ERC20, IERC20Detailed {
     function claimAllYield(address recipient) external {
         require(msg.sender == _operator, "Only the operator.");
         IBlast(BLAST_CONTRACT).claimAllYield(address(this), recipient);
-    }
-
-    function claimMyContractsGas() external {
-        require(
-            msg.sender == _operator,
-            "Only the operator."
-        );
-        IBlast(BLAST_CONTRACT).claimAllGas(address(this), msg.sender);
     }
 
     function configureGovernorOnBehalf(
@@ -495,6 +488,8 @@ contract WorldOfBlast is ERC20, IERC20Detailed {
     {
         return IBlast(BLAST_CONTRACT).readYieldConfiguration(contractAddress);
     }
+
+    /*********************** GAME ***********************/
 
     struct Vote {
         uint256 id;
