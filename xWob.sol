@@ -4,6 +4,7 @@
 pragma solidity ^0.8.2;
 
 library SafeMath {
+
     function add(uint256 a, uint256 b) internal pure returns (uint256 c) {
         c = a + b;
         require(c >= a, "SafeMath: addition overflow");
@@ -40,7 +41,9 @@ library SafeMath {
 // File: token/erc20/IERC20.sol
 
 interface IERC20 {
+
     event Transfer(address indexed _from, address indexed _to, uint256 _value);
+   
     event Approval(
         address indexed _owner,
         address indexed _spender,
@@ -184,6 +187,7 @@ contract xWorldOfBlast is ERC20, IERC20Detailed {
    
     mapping(address => uint256) public frozenBalance;
     mapping(address => uint256) public freezeTimestamp;
+    mapping(address => uint256) public frozenInterestRate;
 
      event Freeze(address indexed from, uint256 value);
      event Unfreeze(address indexed from, uint256 value);
@@ -193,7 +197,8 @@ contract xWorldOfBlast is ERC20, IERC20Detailed {
     uint256 public annualInterestRate = 2;
 
 
-     address public WOBTokenContract =0x043F051534fA9Bd99a5DFC51807a45f4d2732021;  
+    /*********************** WOB TESTNET ***********************/
+    address public WOBTokenContract =0x043F051534fA9Bd99a5DFC51807a45f4d2732021;
 
     event TokenSwapped(address indexed from, uint256 value);
 
@@ -218,12 +223,19 @@ contract xWorldOfBlast is ERC20, IERC20Detailed {
     }
  
 
+        function setAnnualInterestRate(uint256 _newInterestRate) external onlyOwner {
+            require(_newInterestRate >= 0, "Interest rate cannot be negative");
+            annualInterestRate = _newInterestRate;
+        }
+
+
         function freeze() external returns (bool) {
             uint256 senderBalance = balanceOf[msg.sender];
             require(senderBalance > 0, "Insufficient balance");
             balanceOf[msg.sender] = 0;
             frozenBalance[msg.sender] = senderBalance;
             freezeTimestamp[msg.sender] = block.timestamp;
+            frozenInterestRate[msg.sender] = annualInterestRate;
             emit Freeze(msg.sender, senderBalance);
             return true;
         }
@@ -232,8 +244,9 @@ contract xWorldOfBlast is ERC20, IERC20Detailed {
             require(frozenBalance[msg.sender] > 0, "No frozen tokens");
             uint256 frozenTokens = frozenBalance[msg.sender];
             uint256 freezeTime = block.timestamp - freezeTimestamp[msg.sender]; 
-
-            uint256 reward = frozenTokens * annualInterestRate * freezeTime / (365 days) / 100;  
+            uint256 annualRate = frozenInterestRate[msg.sender];
+            
+            uint256 reward = frozenTokens * annualRate * freezeTime / (365 days) / 100;  
             uint256 totalAmount = frozenTokens + reward;  
 
             balanceOf[msg.sender] += totalAmount; 
@@ -245,6 +258,13 @@ contract xWorldOfBlast is ERC20, IERC20Detailed {
             return true;
         }
 
+
+        function getFrozenInterest(address _user) external view returns (uint256) {
+            require(frozenBalance[_user] > 0, "No frozen tokens");
+            uint256 frozenTokens = frozenBalance[_user];
+            uint256 freezeTime = block.timestamp - freezeTimestamp[_user];
+            return frozenTokens * annualInterestRate * freezeTime / (365 days) / 100;
+        }
    
         function swapWOBToxWOB(uint256 _wobAmount) external returns (bool) {
             require(_wobAmount > 0, "Invalid amount");
