@@ -373,119 +373,76 @@ contract WorldOfBlast is ERC20, IERC20Detailed {
         USDB.configure(IERC20Rebasing.YieldMode.CLAIMABLE);
         WETH.configure(IERC20Rebasing.YieldMode.CLAIMABLE);
 
-        IBlastPoints(blastPointsAddress).configurePointsOperator(
-            pointsOperator
-        );
+        IBlastPoints(blastPointsAddress).configurePointsOperator(pointsOperator);
 
         emit OperatorTransferred(address(0), _operator);
 
         emit Transfer(address(0), msg.sender, totalSupply);
     }
 
-    /*********************** BLAST ***********************/
 
-    function setNewPointsOperator(address contractAddress, address newOperator)
-        external
-    {
-        require(msg.sender == owner, "Only the owner.");
-        pointsOperator = newOperator;
-        IBlastPoints(blastPointsAddress).configurePointsOperatorOnBehalf(
-            contractAddress,
-            newOperator
-        );
+    modifier onlyOwner() {
+        require(msg.sender == owner, "Only the owner");
+        _;
     }
 
-    function configureYieldModeTokens(
-        IERC20Rebasing.YieldMode _weth,
-        IERC20Rebasing.YieldMode _usdb
-    ) external {
-        require(msg.sender == _operator, "Only the operator.");
+    modifier onlyOperator() {
+        require(msg.sender == owner, "Only the operator");
+        _;
+    }
+
+
+    /*********************** BLAST ***********************/
+
+    function setNewPointsOperator(address contractAddress, address newOperator) external onlyOwner {
+        pointsOperator = newOperator;
+        IBlastPoints(blastPointsAddress).configurePointsOperatorOnBehalf( contractAddress, newOperator);
+    }
+
+    function configureYieldModeTokens(IERC20Rebasing.YieldMode _weth, IERC20Rebasing.YieldMode _usdb) external onlyOperator {
         USDB.configure(_usdb);
         WETH.configure(_weth);
     }
 
-    function claimYieldTokens(address recipient, uint256 amount) external {
-        require(msg.sender == _operator, "Only the operator.");
+    function claimYieldTokens(address recipient, uint256 amount) external onlyOperator {
         USDB.claim(recipient, amount);
         WETH.claim(recipient, amount);
     }
 
-    function claimYield(address recipient, uint256 amount) external {
-        require(msg.sender == _operator, "Only the operator.");
+    function claimYield(address recipient, uint256 amount) external onlyOperator {
         IBlast(BLAST_CONTRACT).claimYield(address(this), recipient, amount);
     }
 
-    function claimAllYield(address recipient) external {
-        require(msg.sender == _operator, "Only the operator.");
+    function claimAllYield(address recipient) external onlyOperator {
         IBlast(BLAST_CONTRACT).claimAllYield(address(this), recipient);
     }
 
-    function configureGovernorOnBehalf(
-        address _newGovernor,
-        address contractAddress
-    ) public {
-        require(msg.sender == owner, "Only the owner can configure governor.");
+    function configureGovernorOnBehalf(address _newGovernor, address contractAddress) public onlyOwner {
+        IBlast(BLAST_CONTRACT).configureGovernorOnBehalf(_newGovernor, contractAddress);
+        emit OperatorTransferred(_operator, _newGovernor);
         _operator = _newGovernor;
-        IBlast(BLAST_CONTRACT).configureGovernorOnBehalf(
-            _newGovernor,
-            contractAddress
-        );
     }
 
     // claim gas start
-    function claimGasAtMinClaimRate(
-        address contractAddress,
-        address recipientOfGas,
-        uint256 minClaimRateBips
-    ) external returns (uint256) {
-        require(msg.sender == _operator, "Only the owner.");
-        return
-            IBlast(BLAST_CONTRACT).claimGasAtMinClaimRate(
-                contractAddress,
-                recipientOfGas,
-                minClaimRateBips
-            );
+    function claimGasAtMinClaimRate(address contractAddress, address recipientOfGas, uint256 minClaimRateBips) external onlyOwner returns (uint256)  {
+        return IBlast(BLAST_CONTRACT).claimGasAtMinClaimRate(contractAddress, recipientOfGas, minClaimRateBips);
     }
 
-    function claimMaxGas(address contractAddress, address recipientOfGas)
-        external
-        returns (uint256)
-    {
-        require(msg.sender == _operator, "Only the owner can claim max gas.");
-        return
-            IBlast(BLAST_CONTRACT).claimMaxGas(contractAddress, recipientOfGas);
+    function claimMaxGas(address contractAddress, address recipientOfGas) external onlyOwner returns (uint256){
+        return IBlast(BLAST_CONTRACT).claimMaxGas(contractAddress, recipientOfGas);
     }
 
-    function claimGas(
-        address contractAddress,
-        address recipientOfGas,
-        uint256 gasToClaim,
-        uint256 gasSecondsToConsume
-    ) external returns (uint256) {
-        require(msg.sender == owner, "Only the owner can claim gas.");
-        return
-            IBlast(BLAST_CONTRACT).claimGas(
-                contractAddress,
-                recipientOfGas,
-                gasToClaim,
-                gasSecondsToConsume
-            );
+
+    function claimGas(address contractAddress, address recipientOfGas,  uint256 gasToClaim, uint256 gasSecondsToConsume) external onlyOwner returns (uint256) {
+        return IBlast(BLAST_CONTRACT).claimGas(contractAddress, recipientOfGas, gasToClaim, gasSecondsToConsume);
     }
 
     // read functions
-    function readClaimableYield(address contractAddress)
-        external
-        view
-        returns (uint256)
-    {
+    function readClaimableYield(address contractAddress) external view returns (uint256){
         return IBlast(BLAST_CONTRACT).readClaimableYield(contractAddress);
     }
 
-    function readYieldConfiguration(address contractAddress)
-        external
-        view
-        returns (uint8)
-    {
+    function readYieldConfiguration(address contractAddress) external view returns (uint8){
         return IBlast(BLAST_CONTRACT).readYieldConfiguration(contractAddress);
     }
 
@@ -505,7 +462,7 @@ contract WorldOfBlast is ERC20, IERC20Detailed {
 
     mapping(uint256 => Vote) public votes;
 
-    function createVote(string memory _description) public returns (uint256) {
+    function createVote(string memory _description) public onlyOwner returns (uint256) {
         Vote storage newVote = votes[nextVoteId];
         newVote.id = nextVoteId;
         newVote.description = _description;
@@ -527,8 +484,7 @@ contract WorldOfBlast is ERC20, IERC20Detailed {
         }
     }
 
-    function closeVote(uint256 _voteId) public {
-        require(msg.sender == owner, "Only owner can close vote");
+    function closeVote(uint256 _voteId) public onlyOwner {
         require(votes[_voteId].isOpen, "Vote is already closed");
         votes[_voteId].isOpen = false;
     }
