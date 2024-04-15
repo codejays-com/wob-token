@@ -4,7 +4,6 @@
 pragma solidity ^0.8.2;
 
 library SafeMath {
-
     function add(uint256 a, uint256 b) internal pure returns (uint256 c) {
         c = a + b;
         require(c >= a, "SafeMath: addition overflow");
@@ -41,9 +40,8 @@ library SafeMath {
 // File: token/erc20/IERC20.sol
 
 interface IERC20 {
-
     event Transfer(address indexed _from, address indexed _to, uint256 _value);
-   
+
     event Approval(
         address indexed _owner,
         address indexed _spender,
@@ -178,34 +176,33 @@ interface IERC20Detailed {
     function decimals() external view returns (uint8 _decimals);
 }
 
- 
-contract xWorldOfBlast is ERC20, IERC20Detailed {
+contract WorldxOfBlast is ERC20, IERC20Detailed {
     string public name;
     string public symbol;
     uint8 public decimals;
     address payable public owner;
-   
+
     mapping(address => uint256) public frozenBalance;
     mapping(address => uint256) public freezeTimestamp;
     mapping(address => uint256) public frozenInterestRate;
+    mapping(address => uint256) public wobBalances;
 
-     event Freeze(address indexed from, uint256 value);
-     event Unfreeze(address indexed from, uint256 value);
+    event Freeze(address indexed from, uint256 value);
+    event Unfreeze(address indexed from, uint256 value);
 
-     event RewardPaid(address indexed to, uint256 value);
+    event RewardPaid(address indexed to, uint256 value);
 
     uint256 public annualInterestRate = 2;
 
-
     /*********************** WOB TESTNET ***********************/
-    address public WOBTokenContract =0x043F051534fA9Bd99a5DFC51807a45f4d2732021;
+    address public WOBTokenContract =
+        0x043F051534fA9Bd99a5DFC51807a45f4d2732021;
 
-    event TokenSwapped(address indexed from, uint256 value);
+    event TokenSwapped(address user, uint256 amount, string direction);
 
-   
     constructor() {
-        string memory _name = "xWorld Of Blast";
-        string memory _symbol = "xWOB";
+        string memory _name = "Worldx Of Blast";
+        string memory _symbol = "WOBx";
         uint8 _decimals = 18;
         uint256 _initialSupply = 1000000000;
         totalSupply = _initialSupply * 10**uint256(_decimals);
@@ -216,76 +213,81 @@ contract xWorldOfBlast is ERC20, IERC20Detailed {
         owner = payable(msg.sender);
     }
 
-
     modifier onlyOwner() {
         require(msg.sender == owner, "Only the owner");
         _;
     }
- 
 
-        function setAnnualInterestRate(uint256 _newInterestRate) external onlyOwner {
-            require(_newInterestRate >= 0, "Interest rate cannot be negative");
-            annualInterestRate = _newInterestRate;
-        }
+    function setAnnualInterestRate(uint256 _newInterestRate)
+        external
+        onlyOwner
+    {
+        require(_newInterestRate >= 0, "Interest rate cannot be negative");
+        annualInterestRate = _newInterestRate;
+    }
 
+    function freeze() external returns (bool) {
+        uint256 senderBalance = balanceOf[msg.sender];
+        require(senderBalance > 0, "Insufficient balance");
+        balanceOf[msg.sender] = 0;
+        frozenBalance[msg.sender] = senderBalance;
+        freezeTimestamp[msg.sender] = block.timestamp;
+        frozenInterestRate[msg.sender] = annualInterestRate;
+        emit Freeze(msg.sender, senderBalance);
+        return true;
+    }
 
-        function freeze() external returns (bool) {
-            uint256 senderBalance = balanceOf[msg.sender];
-            require(senderBalance > 0, "Insufficient balance");
-            balanceOf[msg.sender] = 0;
-            frozenBalance[msg.sender] = senderBalance;
-            freezeTimestamp[msg.sender] = block.timestamp;
-            frozenInterestRate[msg.sender] = annualInterestRate;
-            emit Freeze(msg.sender, senderBalance);
-            return true;
-        }
+    function unfreeze() external returns (bool) {
+        require(frozenBalance[msg.sender] > 0, "No frozen tokens");
+        uint256 frozenTokens = frozenBalance[msg.sender];
+        uint256 freezeTime = block.timestamp - freezeTimestamp[msg.sender];
+        uint256 annualRate = frozenInterestRate[msg.sender];
 
-        function unfreezeAndPayInterest() external returns (bool) {
-            require(frozenBalance[msg.sender] > 0, "No frozen tokens");
-            uint256 frozenTokens = frozenBalance[msg.sender];
-            uint256 freezeTime = block.timestamp - freezeTimestamp[msg.sender]; 
-            uint256 annualRate = frozenInterestRate[msg.sender];
-            
-            uint256 reward = frozenTokens * annualRate * freezeTime / (365 days) / 100;  
-            uint256 totalAmount = frozenTokens + reward;  
+        uint256 reward = (frozenTokens * annualRate * freezeTime) /
+            (365 days) /
+            100;
+        uint256 totalAmount = frozenTokens + reward;
 
-            balanceOf[msg.sender] += totalAmount; 
-            frozenBalance[msg.sender] = 0;
-            freezeTimestamp[msg.sender] = 0;
+        balanceOf[msg.sender] += totalAmount;
+        frozenBalance[msg.sender] = 0;
+        freezeTimestamp[msg.sender] = 0;
 
-            emit Unfreeze(msg.sender, totalAmount);
-            emit RewardPaid(msg.sender, reward);
-            return true;
-        }
+        emit Unfreeze(msg.sender, totalAmount);
+        emit RewardPaid(msg.sender, reward);
+        return true;
+    }
 
+    function getFrozenInterest(address _user) external view returns (uint256) {
+        require(frozenBalance[_user] > 0, "No frozen tokens");
+        uint256 frozenTokens = frozenBalance[_user];
+        uint256 freezeTime = block.timestamp - freezeTimestamp[_user];
+        return
+            (frozenTokens * annualInterestRate * freezeTime) / (365 days) / 100;
+    }
 
-        function getFrozenInterest(address _user) external view returns (uint256) {
-            require(frozenBalance[_user] > 0, "No frozen tokens");
-            uint256 frozenTokens = frozenBalance[_user];
-            uint256 freezeTime = block.timestamp - freezeTimestamp[_user];
-            return frozenTokens * annualInterestRate * freezeTime / (365 days) / 100;
-        }
-   
-        function swapWOBToxWOB(uint256 _wobAmount) external returns (bool) {
-            require(_wobAmount > 0, "Invalid amount");
-            IERC20(WOBTokenContract).transferFrom(msg.sender, address(this), _wobAmount);
-            balanceOf[msg.sender] += _wobAmount;
-            totalSupply += _wobAmount;
-            emit TokenSwapped(msg.sender, _wobAmount);
-            return true;
-        }
+    function getWOBBalance(address _user) external view returns (uint256) {
+        return IERC20(WOBTokenContract).balanceOf(_user);
+    }
 
+    function swapWOBtoWOBx(uint256 amount) external {
+        require(
+            IERC20(WOBTokenContract).balanceOf(msg.sender) >= amount,
+            "Insufficient WOB balance"
+        );
 
-        function swapxWOBToWOB(uint256 _xwobAmount) external returns (bool) {
-            require(_xwobAmount > 0, "Invalid amount");
-            require(balanceOf[msg.sender] >= _xwobAmount, "Insufficient balance");
-            balanceOf[msg.sender] -= _xwobAmount;
-            totalSupply -= _xwobAmount;
-            IERC20(WOBTokenContract).transfer(msg.sender, _xwobAmount);
+        require(
+            IERC20(WOBTokenContract).transferFrom(
+                msg.sender,
+                address(this),
+                amount
+            ),
+            "WOB transfer failed"
+        );
 
-            emit TokenSwapped(msg.sender, _xwobAmount);
-            return true;
-        }
+        balanceOf[msg.sender] += amount;
 
+        emit Transfer(address(0), msg.sender, amount);
 
+        emit TokenSwapped(msg.sender, amount, "WOB to WOBx");
+    }
 }
