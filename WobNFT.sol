@@ -61,7 +61,7 @@ contract WobNFT is ERC721URIStorage, Ownable {
     }
 
     constructor(address initialOwner)
-        ERC721("World Of Blast NFT", "WOBNFT")
+        ERC721("World Of Blast NFT", "WobNFT")
         Ownable(initialOwner)
     {
         WOB = IERC20(WOBTokenContract);
@@ -196,6 +196,7 @@ contract WobNFT is ERC721URIStorage, Ownable {
     {
         _transfer(msg.sender, to, tokenId);
     }
+ 
 
     function tokenURI(uint256 tokenId)
         public
@@ -204,8 +205,65 @@ contract WobNFT is ERC721URIStorage, Ownable {
         returns (string memory)
     {
         require(balanceOf(ownerOf(tokenId)) > 0, "Token ID does not exist");
-        string memory _tokenURI = tokenURIs[tokenId];
-        return
-            bytes(_tokenURI).length > 0 ? _tokenURI : super.tokenURI(tokenId);
+
+        string memory baseURI = _baseURI();
+        string memory json = string(
+            abi.encodePacked(
+                '{"name": "',
+                items[tokenId].name,
+                '", ',
+                '"description": "NFT Description", ',
+                '"image": "',
+                items[tokenId].imageUrl,
+                '", ',
+                '"attributes": {',
+                '"damage": ',
+                uint2str(items[tokenId].damage),
+                ", ",
+                '"attackSpeed": ',
+                uint2str(items[tokenId].attackSpeed),
+                ", ",
+                '"durability": ',
+                uint2str(items[tokenId].durability),
+                ", ",
+                '"maxDurability": ',
+                uint2str(items[tokenId].maxDurability),
+                ", ",
+                '"durabilityPerUse": ',
+                uint2str(items[tokenId].durabilityPerUse),
+                ", ",
+                '"weaponType": "',
+                items[tokenId].weaponType,
+                '"',
+                "}}"
+            )
+        );
+        return string(abi.encodePacked(baseURI, json));
+    }
+
+    function uint2str(uint256 _i)
+        internal
+        pure
+        returns (string memory _uintAsString)
+    {
+        if (_i == 0) {
+            return "0";
+        }
+        uint256 j = _i;
+        uint256 length;
+        while (j != 0) {
+            length++;
+            j /= 10;
+        }
+        bytes memory bstr = new bytes(length);
+        uint256 k = length;
+        while (_i != 0) {
+            k = k - 1;
+            uint8 temp = (48 + uint8(_i - (_i / 10) * 10));
+            bytes1 b1 = bytes1(temp);
+            bstr[k] = b1;
+            _i /= 10;
+        }
+        return string(bstr);
     }
 }
