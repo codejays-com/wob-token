@@ -1,4 +1,4 @@
-//SPDX-License-Identifier: MIT
+// SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
 import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
@@ -6,6 +6,137 @@ import "@openzeppelin/contracts/token/ERC721/extensions/ERC721URIStorage.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/utils/math/SafeMath.sol";
+
+interface IBlast {
+    enum YieldMode {
+        AUTOMATIC,
+        VOID,
+        CLAIMABLE
+    }
+    enum GasMode {
+        VOID,
+        CLAIMABLE
+    }
+
+    function configureContract(
+        address contractAddress,
+        YieldMode _yield,
+        GasMode gasMode,
+        address governor
+    ) external;
+
+    function configure(
+        YieldMode _yield,
+        GasMode gasMode,
+        address governor
+    ) external;
+
+    function configureClaimableYield() external;
+
+    function configureClaimableYieldOnBehalf(address contractAddress) external;
+
+    function configureAutomaticYield() external;
+
+    function configureAutomaticYieldOnBehalf(address contractAddress) external;
+
+    function configureVoidYield() external;
+
+    function configureVoidYieldOnBehalf(address contractAddress) external;
+
+    function configureClaimableGas() external;
+
+    function configureClaimableGasOnBehalf(address contractAddress) external;
+
+    function configureVoidGas() external;
+
+    function configureVoidGasOnBehalf(address contractAddress) external;
+
+    function configureGovernor(address _governor) external;
+
+    function configureGovernorOnBehalf(
+        address _newGovernor,
+        address contractAddress
+    ) external;
+
+    function claimYield(
+        address contractAddress,
+        address recipientOfYield,
+        uint256 amount
+    ) external returns (uint256);
+
+    function claimAllYield(address contractAddress, address recipientOfYield)
+        external
+        returns (uint256);
+
+    function claimAllGas(address contractAddress, address recipientOfGas)
+        external
+        returns (uint256);
+
+    function claimGasAtMinClaimRate(
+        address contractAddress,
+        address recipientOfGas,
+        uint256 minClaimRateBips
+    ) external returns (uint256);
+
+    function claimMaxGas(address contractAddress, address recipientOfGas)
+        external
+        returns (uint256);
+
+    function claimGas(
+        address contractAddress,
+        address recipientOfGas,
+        uint256 gasToClaim,
+        uint256 gasSecondsToConsume
+    ) external returns (uint256);
+
+    function readClaimableYield(address contractAddress)
+        external
+        view
+        returns (uint256);
+
+    function readYieldConfiguration(address contractAddress)
+        external
+        view
+        returns (uint8);
+
+    function readGasParams(address contractAddress)
+        external
+        view
+        returns (
+            uint256 etherSeconds,
+            uint256 etherBalance,
+            uint256 lastUpdated,
+            GasMode
+        );
+}
+
+interface IBlastPoints {
+    function configurePointsOperator(address operator) external;
+
+    function configurePointsOperatorOnBehalf(
+        address contractAddress,
+        address operator
+    ) external;
+}
+
+interface IERC20Rebasing {
+    enum YieldMode {
+        AUTOMATIC,
+        VOID,
+        CLAIMABLE
+    }
+
+    function configure(YieldMode) external returns (uint256);
+
+    function claim(address recipient, uint256 amount)
+        external
+        returns (uint256);
+
+    function getClaimableAmount(address account)
+        external
+        view
+        returns (uint256);
+}
 
 contract WorldOfBlast is ERC721URIStorage, Ownable {
     using SafeMath for uint256;
@@ -38,54 +169,35 @@ contract WorldOfBlast is ERC721URIStorage, Ownable {
     CraftableItem[] public craftableItems;
 
     IERC20 private WOB;
-    uint256 private tokenIdCounter;
-    string private _baseTokenURI;
-
     address private _operator;
     address payable public _owner;
     address public pointsOperator;
-
     address public constant WOBTokenContract =
         0x043F051534fA9Bd99a5DFC51807a45f4d2732021;
+    address public constant BLAST_CONTRACT =
+        0x4300000000000000000000000000000000000002;
+    address public constant blastPointsAddress =
+        0x2fc95838c71e76ec69ff817983BFf17c710F34E0;
+    IERC20Rebasing public constant USDB =
+        IERC20Rebasing(0x4200000000000000000000000000000000000022);
+    IERC20Rebasing public constant WETH =
+        IERC20Rebasing(0x4200000000000000000000000000000000000023);
+
+    uint256 private tokenIdCounter;
 
     mapping(uint256 => Item) private items;
-    mapping(uint256 => bool) private isForSale;
-    mapping(uint256 => string) private tokenURIs;
     mapping(address => bool) private creators;
 
     event CraftableItemCreated(
         uint256 indexed itemId,
         CraftableItem craftableItem
     );
-
     event CraftableItemEdited(
         uint256 indexed itemId,
         CraftableItem craftableItem
     );
-
     event ItemCreated(uint256 indexed tokenId, address indexed owner);
-
     event ItemUpdated(uint256 indexed tokenId, uint256 durability);
-
-    event ItemListedForSale(
-        uint256 indexed tokenId,
-        address indexed owner,
-        uint256 price
-    );
-
-    event ItemDelistedFromSale(uint256 indexed tokenId, address indexed owner);
-
-    event ItemPurchased(
-        uint256 indexed tokenId,
-        address indexed buyer,
-        address indexed seller,
-        uint256 price
-    );
-
-    event OperatorTransferred(
-        address indexed previousOperator,
-        address indexed newOperator
-    );
 
     modifier onlyTokenOwner(uint256 tokenId) {
         require(
@@ -94,10 +206,12 @@ contract WorldOfBlast is ERC721URIStorage, Ownable {
         );
         _;
     }
+
     modifier onlyOperator() {
         require(msg.sender == _owner, "Only the operator");
         _;
     }
+
     modifier onlyCreator() {
         require(
             creators[msg.sender],
@@ -111,6 +225,27 @@ contract WorldOfBlast is ERC721URIStorage, Ownable {
         _owner = payable(msg.sender);
         _operator = msg.sender;
         creators[msg.sender] = true;
+        pointsOperator = msg.sender;
+        IBlast(BLAST_CONTRACT).configureAutomaticYield();
+        IBlast(BLAST_CONTRACT).configureClaimableYield();
+        IBlast(BLAST_CONTRACT).configureClaimableGas();
+        IBlast(BLAST_CONTRACT).configureGovernor(msg.sender);
+        USDB.configure(IERC20Rebasing.YieldMode.CLAIMABLE);
+        WETH.configure(IERC20Rebasing.YieldMode.CLAIMABLE);
+        IBlastPoints(blastPointsAddress).configurePointsOperator(
+            pointsOperator
+        );
+    }
+
+    function setNewPointsOperator(address contractAddress, address newOperator)
+        external
+        onlyOwner
+    {
+        pointsOperator = newOperator;
+        IBlastPoints(blastPointsAddress).configurePointsOperatorOnBehalf(
+            contractAddress,
+            newOperator
+        );
     }
 
     function getTotalCraftableItems() external view returns (uint256) {
@@ -251,47 +386,6 @@ contract WorldOfBlast is ERC721URIStorage, Ownable {
         }
     }
 
-    function listItemForSale(uint256 tokenId, uint256 price)
-        external
-        onlyTokenOwner(tokenId)
-    {
-        isForSale[tokenId] = true;
-        emit ItemListedForSale(tokenId, ownerOf(tokenId), price);
-    }
-
-    function delistItemForSale(uint256 tokenId)
-        external
-        onlyTokenOwner(tokenId)
-    {
-        isForSale[tokenId] = false;
-        emit ItemDelistedFromSale(tokenId, ownerOf(tokenId));
-    }
-
-    function buyItem(uint256 tokenId) external {
-        address seller = ownerOf(tokenId);
-        address buyer = msg.sender;
-        uint256 price = items[tokenId].price;
-        require(isForSale[tokenId], "Item is not listed for sale");
-        require(balanceOf(seller) > 0, "Seller does not own the token");
-        require(
-            WOB.allowance(buyer, address(this)) >= price,
-            "Insufficient allowance"
-        );
-
-        // Ensure buyer pays the correct amount of tokens
-        require(
-            WOB.transferFrom(buyer, seller, price),
-            "Token transfer failed"
-        );
-
-        // Transfer the NFT to the buyer
-        _transfer(seller, buyer, tokenId);
-
-        // Mark the item as not for sale
-        isForSale[tokenId] = false;
-        emit ItemPurchased(tokenId, buyer, seller, price);
-    }
-
     function updateItemDurability(uint256 tokenId, uint256 newDurability)
         external
         onlyOwner
@@ -299,7 +393,6 @@ contract WorldOfBlast is ERC721URIStorage, Ownable {
         require(balanceOf(ownerOf(tokenId)) > 0, "Token ID does not exist");
         Item storage item = items[tokenId];
         item.durability = newDurability;
-
         emit ItemUpdated(tokenId, newDurability);
     }
 
@@ -325,6 +418,9 @@ contract WorldOfBlast is ERC721URIStorage, Ownable {
                 items[tokenId].imageUrl,
                 '", ',
                 '"attributes": {',
+                '"rarity": ',
+                items[tokenId].rarity,
+                ", ",
                 '"damage": ',
                 uint2str(items[tokenId].damage),
                 ", ",
