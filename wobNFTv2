@@ -1,0 +1,383 @@
+//SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
+import "@openzeppelin/contracts/token/ERC721/extensions/ERC721URIStorage.sol";
+import "@openzeppelin/contracts/access/Ownable.sol";
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "@openzeppelin/contracts/utils/math/SafeMath.sol";
+
+contract WorldOfBlast is ERC721URIStorage, Ownable {
+    using SafeMath for uint256;
+
+    struct Item {
+        string name;
+        string description;
+        uint256 damage;
+        uint256 attackSpeed;
+        uint256 durability;
+        uint256 durabilityPerUse;
+        string weaponType;
+        string imageUrl;
+        uint256 price;
+        Rarity rarity;
+    }
+
+    enum Rarity {
+        Common,
+        Uncommon,
+        Rare,
+        Epic,
+        Legendary
+    }
+
+    struct CraftableItem {
+        Item item;
+    }
+
+    CraftableItem[] public craftableItems;
+
+    IERC20 private WOB;
+    uint256 private tokenIdCounter;
+    string private _baseTokenURI;
+
+    address private _operator;
+    address payable public _owner;
+    address public pointsOperator;
+
+    address public constant WOBTokenContract =
+        0x043F051534fA9Bd99a5DFC51807a45f4d2732021;
+
+    mapping(uint256 => Item) private items;
+    mapping(uint256 => bool) private isForSale;
+    mapping(uint256 => string) private tokenURIs;
+    mapping(address => bool) private creators;
+
+    event CraftableItemCreated(
+        uint256 indexed itemId,
+        CraftableItem craftableItem
+    );
+
+    event CraftableItemEdited(
+        uint256 indexed itemId,
+        CraftableItem craftableItem
+    );
+
+    event ItemCreated(uint256 indexed tokenId, address indexed owner);
+
+    event ItemUpdated(uint256 indexed tokenId, uint256 durability);
+
+    event ItemListedForSale(
+        uint256 indexed tokenId,
+        address indexed owner,
+        uint256 price
+    );
+
+    event ItemDelistedFromSale(uint256 indexed tokenId, address indexed owner);
+
+    event ItemPurchased(
+        uint256 indexed tokenId,
+        address indexed buyer,
+        address indexed seller,
+        uint256 price
+    );
+
+    event OperatorTransferred(
+        address indexed previousOperator,
+        address indexed newOperator
+    );
+
+    modifier onlyTokenOwner(uint256 tokenId) {
+        require(
+            ownerOf(tokenId) == msg.sender,
+            "You are not the owner of this token"
+        );
+        _;
+    }
+    modifier onlyOperator() {
+        require(msg.sender == _owner, "Only the operator");
+        _;
+    }
+    modifier onlyCreator() {
+        require(
+            creators[msg.sender],
+            "Only authorized creator can perform this action"
+        );
+        _;
+    }
+
+    constructor() ERC721("World Of Blast", "WOBNFTs") Ownable(msg.sender) {
+        WOB = IERC20(WOBTokenContract);
+        _owner = payable(msg.sender);
+        _operator = msg.sender;
+        creators[msg.sender] = true;
+    }
+
+    function getTotalCraftableItems() external view returns (uint256) {
+        return craftableItems.length;
+    }
+
+    function getCraftableItem(uint256 _index)
+        external
+        view
+        returns (CraftableItem memory)
+    {
+        require(_index < craftableItems.length, "Index out of range");
+        return craftableItems[_index];
+    }
+
+    function editCraftableItem(
+        uint256 itemId,
+        string memory name,
+        string memory description,
+        uint256 damage,
+        uint256 attackSpeed,
+        uint256 durability,
+        uint256 durabilityPerUse,
+        string memory weaponType,
+        string memory imageUrl,
+        uint256 price,
+        Rarity rarity
+    ) external onlyOwner {
+        require(itemId < craftableItems.length, "Item ID out of range");
+        CraftableItem storage craftableItem = craftableItems[itemId];
+        craftableItem.item.name = name;
+        craftableItem.item.description = description;
+        craftableItem.item.damage = damage;
+        craftableItem.item.attackSpeed = attackSpeed;
+        craftableItem.item.durability = durability;
+        craftableItem.item.durabilityPerUse = durabilityPerUse;
+        craftableItem.item.weaponType = weaponType;
+        craftableItem.item.imageUrl = imageUrl;
+        craftableItem.item.price = price;
+        craftableItem.item.rarity = rarity;
+        emit CraftableItemEdited(itemId, craftableItem);
+    }
+
+    function createCraftableItem(
+        string memory name,
+        string memory description,
+        uint256 damage,
+        uint256 attackSpeed,
+        uint256 durability,
+        uint256 durabilityPerUse,
+        string memory weaponType,
+        string memory imageUrl,
+        uint256 price,
+        Rarity rarity
+    ) external onlyOwner {
+        Item memory newItem = Item(
+            name,
+            description,
+            damage,
+            attackSpeed,
+            durability,
+            durabilityPerUse,
+            weaponType,
+            imageUrl,
+            price,
+            rarity
+        );
+        CraftableItem memory newCraftableItem = CraftableItem(newItem);
+        craftableItems.push(newCraftableItem);
+        emit CraftableItemCreated(craftableItems.length - 1, newCraftableItem);
+    }
+
+    function addCreator(address _creator) external onlyOwner {
+        creators[_creator] = true;
+    }
+
+    function removeCreator(address _creator) external onlyOwner {
+        creators[_creator] = false;
+    }
+
+    function buyRandomItemWithWOB(uint256 quantity) external {
+        for (uint256 i = 0; i < quantity; i++) {
+            uint256 randomTokenId = uint256(
+                keccak256(abi.encodePacked(block.timestamp, tokenIdCounter))
+            );
+            uint256 craftableItemId = uint256(
+                keccak256(abi.encodePacked(block.timestamp, randomTokenId))
+            ) % craftableItems.length;
+
+            CraftableItem memory craftableItem = craftableItems[
+                craftableItemId
+            ];
+            uint256 tokenId = tokenIdCounter++;
+            items[tokenId] = Item(
+                craftableItem.item.name,
+                craftableItem.item.description,
+                craftableItem.item.damage,
+                craftableItem.item.attackSpeed,
+                craftableItem.item.durability,
+                craftableItem.item.durabilityPerUse,
+                craftableItem.item.weaponType,
+                craftableItem.item.imageUrl,
+                craftableItem.item.price,
+                craftableItem.item.rarity
+            );
+            _safeMint(msg.sender, tokenId);
+            _setTokenURI(tokenId, craftableItem.item.imageUrl);
+            emit ItemCreated(tokenId, msg.sender);
+        }
+    }
+
+    function Mint(uint256 craftableItemId, uint256 quantity)
+        external
+        onlyCreator
+    {
+        require(
+            craftableItemId < craftableItems.length,
+            "Invalid craftable item ID"
+        );
+        CraftableItem memory craftableItem = craftableItems[craftableItemId];
+        for (uint256 i = 0; i < quantity; i++) {
+            uint256 tokenId = tokenIdCounter++;
+            items[tokenId] = Item(
+                craftableItem.item.name,
+                craftableItem.item.description,
+                craftableItem.item.damage,
+                craftableItem.item.attackSpeed,
+                craftableItem.item.durability,
+                craftableItem.item.durabilityPerUse,
+                craftableItem.item.weaponType,
+                craftableItem.item.imageUrl,
+                craftableItem.item.price,
+                craftableItem.item.rarity
+            );
+            _safeMint(msg.sender, tokenId);
+            _setTokenURI(tokenId, craftableItem.item.imageUrl);
+            emit ItemCreated(tokenId, msg.sender);
+        }
+    }
+
+    function listItemForSale(uint256 tokenId, uint256 price)
+        external
+        onlyTokenOwner(tokenId)
+    {
+        isForSale[tokenId] = true;
+        emit ItemListedForSale(tokenId, ownerOf(tokenId), price);
+    }
+
+    function delistItemForSale(uint256 tokenId)
+        external
+        onlyTokenOwner(tokenId)
+    {
+        isForSale[tokenId] = false;
+        emit ItemDelistedFromSale(tokenId, ownerOf(tokenId));
+    }
+
+    function buyItem(uint256 tokenId) external {
+        address seller = ownerOf(tokenId);
+        address buyer = msg.sender;
+        uint256 price = items[tokenId].price;
+        require(isForSale[tokenId], "Item is not listed for sale");
+        require(balanceOf(seller) > 0, "Seller does not own the token");
+        require(
+            WOB.allowance(buyer, address(this)) >= price,
+            "Insufficient allowance"
+        );
+
+        // Ensure buyer pays the correct amount of tokens
+        require(
+            WOB.transferFrom(buyer, seller, price),
+            "Token transfer failed"
+        );
+
+        // Transfer the NFT to the buyer
+        _transfer(seller, buyer, tokenId);
+
+        // Mark the item as not for sale
+        isForSale[tokenId] = false;
+        emit ItemPurchased(tokenId, buyer, seller, price);
+    }
+
+    function updateItemDurability(uint256 tokenId, uint256 newDurability)
+        external
+        onlyOwner
+    {
+        require(balanceOf(ownerOf(tokenId)) > 0, "Token ID does not exist");
+        Item storage item = items[tokenId];
+        item.durability = newDurability;
+
+        emit ItemUpdated(tokenId, newDurability);
+    }
+
+    function tokenURI(uint256 tokenId)
+        public
+        view
+        override
+        returns (string memory)
+    {
+        require(balanceOf(ownerOf(tokenId)) > 0, "Token ID does not exist");
+
+        string memory baseURI = _baseURI();
+
+        string memory json = string(
+            abi.encodePacked(
+                '{"name": "',
+                items[tokenId].name,
+                '", ',
+                '"description": "',
+                items[tokenId].description,
+                '", ',
+                '"image": "',
+                items[tokenId].imageUrl,
+                '", ',
+                '"attributes": {',
+                '"damage": ',
+                uint2str(items[tokenId].damage),
+                ", ",
+                '"attackSpeed": ',
+                uint2str(items[tokenId].attackSpeed),
+                ", ",
+                '"durability": ',
+                uint2str(items[tokenId].durability),
+                ", ",
+                '"durabilityPerUse": ',
+                uint2str(items[tokenId].durabilityPerUse),
+                ", ",
+                '"weaponType": "',
+                items[tokenId].weaponType,
+                '", ',
+                '"priceWOB": ',
+                uint2str(items[tokenId].price),
+                "}"
+            )
+        );
+        return string(abi.encodePacked(baseURI, json));
+    }
+
+    function transferItem(address to, uint256 tokenId)
+        external
+        onlyTokenOwner(tokenId)
+    {
+        _transfer(msg.sender, to, tokenId);
+    }
+
+    function uint2str(uint256 _i)
+        internal
+        pure
+        returns (string memory _uintAsString)
+    {
+        if (_i == 0) {
+            return "0";
+        }
+        uint256 j = _i;
+        uint256 length;
+        while (j != 0) {
+            length++;
+            j /= 10;
+        }
+        bytes memory bstr = new bytes(length);
+        uint256 k = length;
+        while (_i != 0) {
+            k = k - 1;
+            uint8 temp = (48 + uint8(_i - (_i / 10) * 10));
+            bytes1 b1 = bytes1(temp);
+            bstr[k] = b1;
+            _i /= 10;
+        }
+        return string(bstr);
+    }
+}
