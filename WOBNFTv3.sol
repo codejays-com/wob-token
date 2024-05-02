@@ -1,11 +1,188 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.0;
+// File: math/SafeMath.sol
 
-import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
-import "@openzeppelin/contracts/token/ERC721/extensions/ERC721URIStorage.sol";
-import "@openzeppelin/contracts/access/Ownable.sol";
-import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import "@openzeppelin/contracts/utils/math/SafeMath.sol";
+pragma solidity ^0.8.2;
+
+library SafeMath {
+    function add(uint256 a, uint256 b) internal pure returns (uint256 c) {
+        c = a + b;
+        require(c >= a, "SafeMath: addition overflow");
+    }
+
+    function sub(uint256 a, uint256 b) internal pure returns (uint256 c) {
+        require(b <= a, "SafeMath: subtraction overflow");
+        return a - b;
+    }
+
+    function mul(uint256 a, uint256 b) internal pure returns (uint256 c) {
+        if (a == 0) {
+            return 0;
+        }
+
+        c = a * b;
+        require(c / a == b, "SafeMath: multiplication overflow");
+    }
+
+    function div(uint256 a, uint256 b) internal pure returns (uint256 c) {
+        // Since Solidity automatically asserts when dividing by 0,
+        // but we only need it to revert.
+        require(b > 0, "SafeMath: division by zero");
+        return a / b;
+    }
+
+    function mod(uint256 a, uint256 b) internal pure returns (uint256 c) {
+        // Same reason as `div`.
+        require(b > 0, "SafeMath: modulo by zero");
+        return a % b;
+    }
+}
+
+// File: token/erc20/IERC20.sol
+
+interface IERC20 {
+    event Transfer(address indexed _from, address indexed _to, uint256 _value);
+    event Approval(
+        address indexed _owner,
+        address indexed _spender,
+        uint256 _value
+    );
+
+    function totalSupply() external view returns (uint256 _supply);
+
+    function balanceOf(address _owner) external view returns (uint256 _balance);
+
+    function approve(address _spender, uint256 _value)
+        external
+        returns (bool _success);
+
+    function allowance(address _owner, address _spender)
+        external
+        view
+        returns (uint256 _value);
+
+    function transfer(address _to, uint256 _value)
+        external
+        returns (bool _success);
+
+    function transferFrom(
+        address _from,
+        address _to,
+        uint256 _value
+    ) external returns (bool _success);
+}
+
+// File: token/erc20/ERC20.sol
+
+contract ERC20 is IERC20 {
+    using SafeMath for uint256;
+
+    uint256 public totalSupply;
+    mapping(address => uint256) public balanceOf;
+    mapping(address => mapping(address => uint256)) internal _allowance;
+
+    function approve(address _spender, uint256 _value) public returns (bool) {
+        _approve(msg.sender, _spender, _value);
+        return true;
+    }
+
+    function allowance(address _owner, address _spender)
+        public
+        view
+        returns (uint256)
+    {
+        return _allowance[_owner][_spender];
+    }
+
+    function increaseAllowance(address _spender, uint256 _value)
+        public
+        returns (bool)
+    {
+        _approve(
+            msg.sender,
+            _spender,
+            _allowance[msg.sender][_spender].add(_value)
+        );
+        return true;
+    }
+
+    function decreaseAllowance(address _spender, uint256 _value)
+        public
+        returns (bool)
+    {
+        _approve(
+            msg.sender,
+            _spender,
+            _allowance[msg.sender][_spender].sub(_value)
+        );
+        return true;
+    }
+
+    function transfer(address _to, uint256 _value)
+        public
+        returns (bool _success)
+    {
+        _transfer(msg.sender, _to, _value);
+        return true;
+    }
+
+    function transferFrom(
+        address _from,
+        address _to,
+        uint256 _value
+    ) public returns (bool _success) {
+        _transfer(_from, _to, _value);
+        _approve(_from, msg.sender, _allowance[_from][msg.sender].sub(_value));
+        return true;
+    }
+
+    function _approve(
+        address _owner,
+        address _spender,
+        uint256 _amount
+    ) internal {
+        require(_owner != address(0), "ERC20: approve from the zero address");
+        require(_spender != address(0), "ERC20: approve to the zero address");
+
+        _allowance[_owner][_spender] = _amount;
+        emit Approval(_owner, _spender, _amount);
+    }
+
+    function _transfer(
+        address _from,
+        address _to,
+        uint256 _value
+    ) internal {
+        require(_from != address(0), "ERC20: transfer from the zero address");
+        require(_to != address(0), "ERC20: transfer to the zero address");
+        require(
+            _to != address(this),
+            "ERC20: transfer to this contract address"
+        );
+
+        balanceOf[_from] = balanceOf[_from].sub(_value);
+        balanceOf[_to] = balanceOf[_to].add(_value);
+        emit Transfer(_from, _to, _value);
+    }
+}
+
+// File: token/erc20/IERC20Detailed.sol
+
+interface IERC20Detailed {
+    function name() external view returns (string memory _name);
+
+    function symbol() external view returns (string memory _symbol);
+
+    function decimals() external view returns (uint8 _decimals);
+}
+
+interface IBlastPoints {
+    function configurePointsOperator(address operator) external;
+
+    function configurePointsOperatorOnBehalf(
+        address contractAddress,
+        address operator
+    ) external;
+}
 
 interface IBlast {
     enum YieldMode {
@@ -13,11 +190,13 @@ interface IBlast {
         VOID,
         CLAIMABLE
     }
+
     enum GasMode {
         VOID,
         CLAIMABLE
     }
 
+    // configure
     function configureContract(
         address contractAddress,
         YieldMode _yield,
@@ -31,6 +210,7 @@ interface IBlast {
         address governor
     ) external;
 
+    // base configuration options
     function configureClaimableYield() external;
 
     function configureClaimableYieldOnBehalf(address contractAddress) external;
@@ -58,6 +238,7 @@ interface IBlast {
         address contractAddress
     ) external;
 
+    // claim yield
     function claimYield(
         address contractAddress,
         address recipientOfYield,
@@ -68,6 +249,7 @@ interface IBlast {
         external
         returns (uint256);
 
+    // claim gas
     function claimAllGas(address contractAddress, address recipientOfGas)
         external
         returns (uint256);
@@ -89,6 +271,7 @@ interface IBlast {
         uint256 gasSecondsToConsume
     ) external returns (uint256);
 
+    // read functions
     function readClaimableYield(address contractAddress)
         external
         view
@@ -110,15 +293,6 @@ interface IBlast {
         );
 }
 
-interface IBlastPoints {
-    function configurePointsOperator(address operator) external;
-
-    function configurePointsOperatorOnBehalf(
-        address contractAddress,
-        address operator
-    ) external;
-}
-
 interface IERC20Rebasing {
     enum YieldMode {
         AUTOMATIC,
@@ -126,228 +300,100 @@ interface IERC20Rebasing {
         CLAIMABLE
     }
 
+    // changes the yield mode of the caller and update the balance
+    // to reflect the configuration
     function configure(YieldMode) external returns (uint256);
 
+    // "claimable" yield mode accounts can call this this claim their yield
+    // to another address
     function claim(address recipient, uint256 amount)
         external
         returns (uint256);
 
+    // read the claimable amount for an account
     function getClaimableAmount(address account)
         external
         view
         returns (uint256);
 }
 
-// Crafting contract
-contract Crafting {
-    struct Item {
-        string name;
-        string description;
-        uint256 damage;
-        uint256 attackSpeed;
-        uint256 durability;
-        uint256 durabilityPerUse;
-        string weaponType;
-        string imageUrl;
-        uint256 price;
-        string rarity;
-    }
-
-    Item[] public craftableItems;
-    mapping(uint256 => uint256) public craftableItemIndex;
-
-    uint256 public totalCraftableItems;
-
-    address public owner;
-
-    event CraftableItemCreated(uint256 indexed itemId, Item craftableItem);
-    event CraftableItemEdited(uint256 indexed itemId, Item craftableItem);
-    event CraftableItemDeleted(uint256 indexed itemId);
-
-    modifier onlyOwner() {
-        require(
-            msg.sender == owner,
-            "Only contract owner can call this function"
-        );
-        _;
-    }
-
-    constructor() {
-        owner = msg.sender;
-    }
-
-    function createCraftableItem(
-        string memory name,
-        string memory description,
-        uint256 damage,
-        uint256 attackSpeed,
-        uint256 durability,
-        uint256 durabilityPerUse,
-        string memory weaponType,
-        string memory imageUrl,
-        uint256 price,
-        string memory rarity
-    ) external onlyOwner {
-        Item memory newItem = Item({
-            name: name,
-            description: description,
-            damage: damage,
-            attackSpeed: attackSpeed,
-            durability: durability,
-            durabilityPerUse: durabilityPerUse,
-            weaponType: weaponType,
-            imageUrl: imageUrl,
-            price: price,
-            rarity: rarity
-        });
-        craftableItems.push(newItem);
-        craftableItemIndex[totalCraftableItems] = craftableItems.length - 1;
-        totalCraftableItems++;
-        emit CraftableItemCreated(totalCraftableItems - 1, newItem);
-    }
-
-    function editCraftableItem(
-        uint256 itemId,
-        string memory name,
-        string memory description,
-        uint256 damage,
-        uint256 attackSpeed,
-        uint256 durability,
-        uint256 durabilityPerUse,
-        string memory weaponType,
-        string memory imageUrl,
-        uint256 price,
-        string memory rarity
-    ) external onlyOwner {
-        require(itemId < totalCraftableItems, "Item ID out of range");
-        uint256 index = craftableItemIndex[itemId];
-        Item storage craftableItem = craftableItems[index];
-        craftableItem.name = name;
-        craftableItem.description = description;
-        craftableItem.damage = damage;
-        craftableItem.attackSpeed = attackSpeed;
-        craftableItem.durability = durability;
-        craftableItem.durabilityPerUse = durabilityPerUse;
-        craftableItem.weaponType = weaponType;
-        craftableItem.imageUrl = imageUrl;
-        craftableItem.price = price;
-        craftableItem.rarity = rarity;
-        emit CraftableItemEdited(itemId, craftableItem);
-    }
-
-    function deleteCraftableItem(uint256 itemId) external onlyOwner {
-        require(itemId < totalCraftableItems, "Item ID out of range");
-        uint256 indexToDelete = craftableItemIndex[itemId];
-        delete craftableItems[indexToDelete];
-        emit CraftableItemDeleted(itemId);
-    }
-}
-
-contract WorldOfBlastNft is ERC721URIStorage, Ownable {
-    using SafeMath for uint256;
-    Crafting public craftingContract;
-
-    struct Item {
-        string name;
-        string description;
-        uint256 damage;
-        uint256 attackSpeed;
-        uint256 durability;
-        uint256 durabilityPerUse;
-        string weaponType;
-        string imageUrl;
-        uint256 price;
-        string rarity;
-    }
-
-    IERC20 private WOB;
+contract WorldOfBlast is ERC20, IERC20Detailed {
+    string public name;
+    string public symbol;
+    uint8 public decimals;
+    address payable public owner;
     address private _operator;
-    address payable public _owner;
     address public pointsOperator;
 
-    address public constant WOBTokenContract =
-        0x0BCAEec9dF553b0E59a0928FCCd9dcf8C0b42601;
-    address public constant BLAST_CONTRACT =
-        0x4300000000000000000000000000000000000002;
-    address public constant blastPointsAddress =
-        0x2fc95838c71e76ec69ff817983BFf17c710F34E0;
-    IERC20Rebasing public constant USDB =
-        IERC20Rebasing(0x4200000000000000000000000000000000000022);
-    IERC20Rebasing public constant WETH =
-        IERC20Rebasing(0x4200000000000000000000000000000000000023);
-
-    uint256 public priceToCreateNftWOB;
-    uint256 private tokenIdCounter;
-    string private _contractURI;
-
-    mapping(uint256 => Item) private items;
-    mapping(address => bool) private creators;
-
-    event ItemCreated(uint256 indexed tokenId, address indexed owner);
-    event ItemUpdated(uint256 indexed tokenId, uint256 durability);
     event OperatorTransferred(
         address indexed previousOperator,
         address indexed newOperator
     );
 
-    modifier onlyTokenOwner(uint256 tokenId) {
-        require(
-            ownerOf(tokenId) == msg.sender,
-            "You are not the owner of this token"
-        );
-        _;
-    }
+    address public constant BLAST_CONTRACT =
+        0x4300000000000000000000000000000000000002;
 
-    modifier onlyOperator() {
-        require(msg.sender == _owner, "Only the operator");
-        _;
-    }
+    /*********************** BLAST MAINNET ***********************/
+    /**
+    address public constant blastPointsAddress = 0x2536FE9ab3F511540F2f9e2eC2A805005C3Dd800;
+    IERC20Rebasing public constant USDB = IERC20Rebasing(0x4300000000000000000000000000000000000003);
+    IERC20Rebasing public constant WETH = IERC20Rebasing(0x4300000000000000000000000000000000000004);
+    **/
 
-    modifier onlyCreator() {
-        require(
-            creators[msg.sender],
-            "Only authorized creator can perform this action"
-        );
-        _;
-    }
+    /*********************** BLAST TESTNET ***********************/
+    address public constant blastPointsAddress =
+        0x2fc95838c71e76ec69ff817983BFf17c710F34E0;
 
-    constructor() ERC721("World Of Blast", "WOBNFTs") Ownable(msg.sender) {
-        WOB = IERC20(WOBTokenContract);
-        _owner = payable(msg.sender);
+    IERC20Rebasing public constant USDB =
+        IERC20Rebasing(0x4200000000000000000000000000000000000022);
+
+    IERC20Rebasing public constant WETH =
+        IERC20Rebasing(0x4200000000000000000000000000000000000023);
+
+    constructor() {
+        string memory _name = "World Of Blast";
+        string memory _symbol = "WOB";
+        uint8 _decimals = 18;
+        uint256 _initialSupply = 1000000000;
+        totalSupply = _initialSupply * 10**uint256(_decimals);
+        balanceOf[msg.sender] = totalSupply;
+        name = _name;
+        symbol = _symbol;
+        decimals = _decimals;
+        owner = payable(msg.sender);
         _operator = msg.sender;
-        creators[msg.sender] = true;
+
         pointsOperator = msg.sender;
-        _contractURI = "https://worldofblast.com/assets/contract.json";
-        priceToCreateNftWOB = 10;
+
         IBlast(BLAST_CONTRACT).configureAutomaticYield();
         IBlast(BLAST_CONTRACT).configureClaimableYield();
         IBlast(BLAST_CONTRACT).configureClaimableGas();
         IBlast(BLAST_CONTRACT).configureGovernor(msg.sender);
+
         USDB.configure(IERC20Rebasing.YieldMode.CLAIMABLE);
         WETH.configure(IERC20Rebasing.YieldMode.CLAIMABLE);
+
         IBlastPoints(blastPointsAddress).configurePointsOperator(
             pointsOperator
         );
 
-        craftingContract = new Crafting();
+        emit OperatorTransferred(address(0), _operator);
+
+        emit Transfer(address(0), msg.sender, totalSupply);
     }
 
-    function contractURI() public view returns (string memory) {
-        return _contractURI;
+    modifier onlyOwner() {
+        require(msg.sender == owner, "Only the owner");
+        _;
     }
 
-    function updateContractURI(string memory newContractURI)
-        external
-        onlyOwner
-    {
-        _contractURI = newContractURI;
-    }
-
-    function updatePriceToCreateNftWOB(uint256 price) external onlyOwner {
-        priceToCreateNftWOB = price;
+    modifier onlyOperator() {
+        require(msg.sender == owner, "Only the operator");
+        _;
     }
 
     /*********************** BLAST ***********************/
+
     function setNewPointsOperator(address contractAddress, address newOperator)
         external
         onlyOwner
@@ -398,6 +444,7 @@ contract WorldOfBlastNft is ERC721URIStorage, Ownable {
         _operator = _newGovernor;
     }
 
+    // claim gas start
     function claimGasAtMinClaimRate(
         address contractAddress,
         address recipientOfGas,
@@ -435,317 +482,80 @@ contract WorldOfBlastNft is ERC721URIStorage, Ownable {
             );
     }
 
-    function createCraftableItem(
-        string memory name,
-        string memory description,
-        uint256 damage,
-        uint256 attackSpeed,
-        uint256 durability,
-        uint256 durabilityPerUse,
-        string memory weaponType,
-        string memory imageUrl,
-        uint256 price,
-        string memory rarity
-    ) external onlyOwner {
-        craftingContract.createCraftableItem(
-            name,
-            description,
-            damage,
-            attackSpeed,
-            durability,
-            durabilityPerUse,
-            weaponType,
-            imageUrl,
-            price,
-            rarity
-        );
-    }
-
-    function editCraftableItem(
-        uint256 itemId,
-        string memory name,
-        string memory description,
-        uint256 damage,
-        uint256 attackSpeed,
-        uint256 durability,
-        uint256 durabilityPerUse,
-        string memory weaponType,
-        string memory imageUrl,
-        uint256 price,
-        string memory rarity
-    ) external onlyOwner {
-        craftingContract.editCraftableItem(
-            itemId,
-            name,
-            description,
-            damage,
-            attackSpeed,
-            durability,
-            durabilityPerUse,
-            weaponType,
-            imageUrl,
-            price,
-            rarity
-        );
-    }
-
-    function getCraftableItem(uint256 itemId)
+    // read functions
+    function readClaimableYield(address contractAddress)
         external
         view
-        returns (string memory)
+        returns (uint256)
     {
-        require(
-            itemId < craftingContract.totalCraftableItems(),
-            "Index out of range"
-        );
-
-        (
-            string memory name,
-            string memory description,
-            uint256 damage,
-            uint256 attackSpeed,
-            uint256 durability,
-            uint256 durabilityPerUse,
-            string memory weaponType,
-            string memory imageUrl,
-            uint256 price,
-            string memory rarity
-        ) = craftingContract.craftableItems(itemId);
-
-        string memory json = string(
-            abi.encodePacked(
-                '{"name": "',
-                name,
-                '", ',
-                '"description": "',
-                description,
-                '", ',
-                '"damage": ',
-                uint2str(damage),
-                ", ",
-                '"attackSpeed": ',
-                uint2str(attackSpeed),
-                ", ",
-                '"durability": ',
-                uint2str(durability),
-                ", ",
-                '"durabilityPerUse": ',
-                uint2str(durabilityPerUse),
-                ", ",
-                '"weaponType": "',
-                weaponType,
-                '", ',
-                '"imageUrl": "',
-                imageUrl,
-                '", ',
-                '"price": ',
-                uint2str(price),
-                ", ",
-                '"rarity": "',
-                rarity,
-                '"}'
-            )
-        );
-
-        return json;
+        return IBlast(BLAST_CONTRACT).readClaimableYield(contractAddress);
     }
 
-    function deleteCraftableItem(uint256 itemId) external onlyOwner {
-        craftingContract.deleteCraftableItem(itemId);
-    }
-
-    function addCreator(address _creator) external onlyOwner {
-        creators[_creator] = true;
-    }
-
-    function removeCreator(address _creator) external onlyOwner {
-        creators[_creator] = false;
-    }
-
-    function mint(uint256 craftableItemId, uint256 quantity)
+    function readYieldConfiguration(address contractAddress)
         external
-        onlyCreator
+        view
+        returns (uint8)
     {
-        require(
-            craftableItemId < craftingContract.totalCraftableItems(),
-            "Invalid craftable item ID"
-        );
-        (
-            string memory name,
-            string memory description,
-            uint256 damage,
-            uint256 attackSpeed,
-            uint256 durability,
-            uint256 durabilityPerUse,
-            string memory weaponType,
-            string memory imageUrl,
-            uint256 price,
-            string memory rarity
-        ) = craftingContract.craftableItems(craftableItemId);
-        for (uint256 i = 0; i < quantity; i++) {
-            uint256 tokenId = tokenIdCounter++;
-            items[tokenId] = Item(
-                name,
-                description,
-                damage,
-                attackSpeed,
-                durability,
-                durabilityPerUse,
-                weaponType,
-                imageUrl,
-                price,
-                rarity
-            );
-            _safeMint(msg.sender, tokenId);
-            _setTokenURI(tokenId, imageUrl);
-            emit ItemCreated(tokenId, msg.sender);
-        }
+        return IBlast(BLAST_CONTRACT).readYieldConfiguration(contractAddress);
     }
 
-    function mintWithWOB(uint256 quantity) external {
-        uint256 priceWOB = priceToCreateNftWOB * quantity;
+    /*********************** GAME ***********************/
 
-        require(
-            WOB.balanceOf(msg.sender) >= priceWOB,
-            "Insufficient WOB balance"
-        );
-
-        require(
-            WOB.allowance(msg.sender, address(this)) >= priceWOB,
-            "Insufficient allowance for WOB"
-        );
-
-        require(
-            WOB.transferFrom(msg.sender, address(this), priceWOB),
-            "Failed to transfer WOB"
-        );
-
-        for (uint256 i = 0; i < quantity; i++) {
-            uint256 randomTokenId = uint256(
-                keccak256(abi.encodePacked(block.timestamp, tokenIdCounter))
-            );
-            uint256 craftableItemId = randomTokenId %
-                craftingContract.totalCraftableItems();
-            (
-                string memory name,
-                string memory description,
-                uint256 damage,
-                uint256 attackSpeed,
-                uint256 durability,
-                uint256 durabilityPerUse,
-                string memory weaponType,
-                string memory imageUrl,
-                uint256 price,
-                string memory rarity
-            ) = craftingContract.craftableItems(craftableItemId);
-
-            uint256 tokenId = tokenIdCounter++;
-            items[tokenId] = Item(
-                name,
-                description,
-                damage,
-                attackSpeed,
-                durability,
-                durabilityPerUse,
-                weaponType,
-                imageUrl,
-                price,
-                rarity
-            );
-            _safeMint(msg.sender, tokenId);
-            _setTokenURI(tokenId, imageUrl);
-            emit ItemCreated(tokenId, msg.sender);
-        }
+    struct Vote {
+        uint256 id;
+        string description;
+        uint256 positiveVotes;
+        uint256 negativeVotes;
+        bool isOpen;
+        mapping(address => bool) hasVoted;
+        mapping(address => bool) voters;
     }
 
-    function updateItemDurability(uint256 tokenId, uint256 newDurability)
-        external
+    uint256 public nextVoteId;
+
+    mapping(uint256 => Vote) public votes;
+
+    function createVote(string memory _description)
+        public
         onlyOwner
+        returns (uint256)
     {
-        require(balanceOf(ownerOf(tokenId)) > 0, "Token ID does not exist");
-        Item storage item = items[tokenId];
-        item.durability = newDurability;
-        emit ItemUpdated(tokenId, newDurability);
+        Vote storage newVote = votes[nextVoteId];
+        newVote.id = nextVoteId;
+        newVote.description = _description;
+        newVote.isOpen = true;
+        nextVoteId++;
+        return newVote.id;
     }
 
-    function transferItem(address to, uint256 tokenId)
-        external
-        onlyTokenOwner(tokenId)
-    {
-        _transfer(msg.sender, to, tokenId);
+    function vote(uint256 _voteId, bool _decision) public {
+        Vote storage currentVote = votes[_voteId];
+        require(currentVote.isOpen, "Vote is not open");
+        require(!currentVote.hasVoted[msg.sender], "Already voted");
+        currentVote.hasVoted[msg.sender] = true;
+        currentVote.voters[msg.sender] = true;
+        if (_decision) {
+            currentVote.positiveVotes++;
+        } else {
+            currentVote.negativeVotes++;
+        }
     }
 
-    function tokenURI(uint256 tokenId)
+    function closeVote(uint256 _voteId) public onlyOwner {
+        require(votes[_voteId].isOpen, "Vote is already closed");
+        votes[_voteId].isOpen = false;
+    }
+
+    function getVoteResult(uint256 _voteId)
         public
         view
-        override
-        returns (string memory)
+        returns (uint256 positiveVotes, uint256 negativeVotes)
     {
-        require(balanceOf(ownerOf(tokenId)) > 0, "Token ID does not exist");
-
-        string memory baseURI = _baseURI();
-
-        string memory json = string(
-            abi.encodePacked(
-                '{"name": "',
-                items[tokenId].name,
-                '", ',
-                '"description": "',
-                items[tokenId].description,
-                '", ',
-                '"image": "',
-                items[tokenId].imageUrl,
-                '", ',
-                '"attributes": {',
-                '"damage": ',
-                uint2str(items[tokenId].damage),
-                ", ",
-                '"attackSpeed": ',
-                uint2str(items[tokenId].attackSpeed),
-                ", ",
-                '"durability": ',
-                uint2str(items[tokenId].durability),
-                ", ",
-                '"durabilityPerUse": ',
-                uint2str(items[tokenId].durabilityPerUse),
-                ", ",
-                '"rarity": "',
-                items[tokenId].rarity,
-                '", ',
-                '"weaponType": "',
-                items[tokenId].weaponType,
-                '"',
-                "}, ",
-                '"external_link": "https://worldofblast.com"'
-                "}"
-            )
-        );
-        return string(abi.encodePacked(baseURI, json));
+        return (votes[_voteId].positiveVotes, votes[_voteId].negativeVotes);
     }
 
-    function uint2str(uint256 _i)
-        internal
-        pure
-        returns (string memory _uintAsString)
-    {
-        if (_i == 0) {
-            return "0";
-        }
-        uint256 j = _i;
-        uint256 length;
-        while (j != 0) {
-            length++;
-            j /= 10;
-        }
-        bytes memory bstr = new bytes(length);
-        uint256 k = length;
-        while (_i != 0) {
-            k = k - 1;
-            uint8 temp = (48 + uint8(_i - (_i / 10) * 10));
-            bytes1 b1 = bytes1(temp);
-            bstr[k] = b1;
-            _i /= 10;
-        }
-        return string(bstr);
+    function getDecision(uint256 _voteId) public view returns (bool decision) {
+        require(votes[_voteId].voters[msg.sender], "Not a voter for this vote");
+        return votes[_voteId].positiveVotes > votes[_voteId].negativeVotes;
     }
 }
