@@ -189,7 +189,6 @@ contract WorldOfBlastNft is ERC721URIStorage, Ownable {
     address public constant BLAST_CONTRACT =
         0x4300000000000000000000000000000000000002;
 
-    /*********************** BLAST TESTNET ***********************/
     address public constant blastPointsAddress =
         0x2fc95838c71e76ec69ff817983BFf17c710F34E0;
 
@@ -208,6 +207,7 @@ contract WorldOfBlastNft is ERC721URIStorage, Ownable {
 
     event ItemCreated(uint256 indexed tokenId, address indexed owner);
     event ItemUpdated(uint256 indexed tokenId, uint256 durability);
+
     event InBattleSet(uint256 indexed tokenId, bool value);
 
     modifier onlyTokenOwner(uint256 tokenId) {
@@ -283,6 +283,14 @@ contract WorldOfBlastNft is ERC721URIStorage, Ownable {
         return craftingContract.craftableItems;
     }
 
+    function getCraftableItem(uint256 index)
+        external
+        view
+        returns (CraftingItem memory)
+    {
+        return craftingContract.craftableItems[index];
+    }
+
     function createCraftableItem(
         string memory name,
         string memory description,
@@ -347,7 +355,7 @@ contract WorldOfBlastNft is ERC721URIStorage, Ownable {
         craftableItem.rarity = rarity;
     }
 
-    function deleteCraftableItem(uint256 itemId) external onlyCreator {
+    function deleteCraftableItem(uint256 itemId) external onlyOwner {
         require(
             itemId < craftingContract.totalCraftableItems,
             "Item ID out of range"
@@ -390,7 +398,6 @@ contract WorldOfBlastNft is ERC721URIStorage, Ownable {
 
     function mintWithWOB(uint256 quantity) external {
         uint256 priceWOB = priceToCreateNftWOB * quantity;
-
         require(
             WOB.balanceOf(msg.sender) >= priceWOB,
             "Insufficient WOB balance"
