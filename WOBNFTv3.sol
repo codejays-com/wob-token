@@ -1,129 +1,11 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
+
 import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
 import "@openzeppelin/contracts/token/ERC721/extensions/ERC721URIStorage.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/utils/math/SafeMath.sol";
-
-// Crafting contract
-contract Crafting {
-    struct Item {
-        string name;
-        string description;
-        uint256 damage;
-        uint256 attackSpeed;
-        uint256 durability;
-        uint256 durabilityPerUse;
-        string weaponType;
-        string imageUrl;
-        uint256 price;
-        string rarity;
-    }
-
-    Item[] public craftableItems;
-    mapping(uint256 => uint256) public craftableItemIndex;
-    mapping(address => bool) public creators;
-
-    uint256 public totalCraftableItems;
-
-    address public owner;
-
-    event CraftableItemCreated(uint256 indexed itemId, Item craftableItem);
-    event CraftableItemEdited(uint256 indexed itemId, Item craftableItem);
-    event CraftableItemDeleted(uint256 indexed itemId);
-
-    modifier onlyOwnerOrCreator() {
-        require(
-            msg.sender == owner || creators[msg.sender],
-            "Only owner or creator"
-        );
-        _;
-    }
-
-    constructor() {
-        creators[msg.sender] = true;
-        owner = msg.sender;
-    }
-
-    function addCreator(address _creator) external onlyOwnerOrCreator {
-        creators[_creator] = true;
-    }
-
-    function removeCreator(address _creator) external onlyOwnerOrCreator {
-        creators[_creator] = false;
-    }
-
-    function createCraftableItem(
-        string memory name,
-        string memory description,
-        uint256 damage,
-        uint256 attackSpeed,
-        uint256 durability,
-        uint256 durabilityPerUse,
-        string memory weaponType,
-        string memory imageUrl,
-        uint256 price,
-        string memory rarity
-    ) external onlyOwnerOrCreator {
-        Item memory newItem = Item({
-            name: name,
-            description: description,
-            damage: damage,
-            attackSpeed: attackSpeed,
-            durability: durability,
-            durabilityPerUse: durabilityPerUse,
-            weaponType: weaponType,
-            imageUrl: imageUrl,
-            price: price,
-            rarity: rarity
-        });
-        craftableItems.push(newItem);
-        craftableItemIndex[totalCraftableItems] = craftableItems.length - 1;
-        totalCraftableItems++;
-        emit CraftableItemCreated(totalCraftableItems - 1, newItem);
-    }
-
-    function editCraftableItem(
-        uint256 itemId,
-        string memory name,
-        string memory description,
-        uint256 damage,
-        uint256 attackSpeed,
-        uint256 durability,
-        uint256 durabilityPerUse,
-        string memory weaponType,
-        string memory imageUrl,
-        uint256 price,
-        string memory rarity
-    ) external onlyOwnerOrCreator {
-        require(itemId < totalCraftableItems, "Item ID out of range");
-        uint256 index = craftableItemIndex[itemId];
-        Item storage craftableItem = craftableItems[index];
-        craftableItem.name = name;
-        craftableItem.description = description;
-        craftableItem.damage = damage;
-        craftableItem.attackSpeed = attackSpeed;
-        craftableItem.durability = durability;
-        craftableItem.durabilityPerUse = durabilityPerUse;
-        craftableItem.weaponType = weaponType;
-        craftableItem.imageUrl = imageUrl;
-        craftableItem.price = price;
-        craftableItem.rarity = rarity;
-        emit CraftableItemEdited(itemId, craftableItem);
-    }
-
-    function deleteCraftableItem(uint256 itemId) external onlyOwnerOrCreator {
-        require(itemId < totalCraftableItems, "Item ID out of range");
-        uint256 indexToDelete = craftableItemIndex[itemId];
-        delete craftableItems[indexToDelete];
-        emit CraftableItemDeleted(itemId);
-    }
-
-    function getAllCraftableItems() external view returns (Item[] memory) {
-        return craftableItems;
-    }
-}
 
 contract WorldOfBlastNft is ERC721URIStorage, Ownable {
     using SafeMath for uint256;
@@ -142,7 +24,28 @@ contract WorldOfBlastNft is ERC721URIStorage, Ownable {
         bool isStaked;
     }
 
-    Crafting public craftingContract;
+    struct CraftingItem {
+        string name;
+        string description;
+        uint256 damage;
+        uint256 attackSpeed;
+        uint256 durability;
+        uint256 durabilityPerUse;
+        string weaponType;
+        string imageUrl;
+        uint256 price;
+        string rarity;
+    }
+
+    struct Crafting {
+        CraftingItem[] craftableItems;
+        mapping(uint256 => uint256) craftableItemIndex;
+        mapping(address => bool) creators;
+        uint256 totalCraftableItems;
+        address owner;
+    }
+
+    Crafting private craftingContract;
     IERC20 private WOB;
 
     address payable public _owner;
@@ -168,6 +71,7 @@ contract WorldOfBlastNft is ERC721URIStorage, Ownable {
         );
         _;
     }
+
     modifier onlyOwnerOrCreator() {
         require(
             msg.sender == _owner || creators[msg.sender],
@@ -181,7 +85,7 @@ contract WorldOfBlastNft is ERC721URIStorage, Ownable {
         _owner = payable(msg.sender);
         _contractURI = "https://worldofblast.com/assets/contract.json";
         creators[msg.sender] = true;
-        craftingContract = new Crafting();
+        craftingContract.owner = msg.sender;
     }
 
     function withdrawWOB(address to, uint256 amount) external onlyOwner {
@@ -198,20 +102,20 @@ contract WorldOfBlastNft is ERC721URIStorage, Ownable {
 
     function addCreator(address _creator) external onlyOwner {
         creators[_creator] = true;
-        craftingContract.addCreator(_creator);
+        craftingContract.creators[_creator] = true;
     }
 
     function removeCreator(address _creator) external onlyOwner {
         creators[_creator] = false;
-        craftingContract.removeCreator(_creator);
+        craftingContract.creators[_creator] = false;
     }
 
     function getAllCraftableItems()
         external
         view
-        returns (Crafting.Item[] memory)
+        returns (CraftingItem[] memory)
     {
-        return craftingContract.getAllCraftableItems();
+        return craftingContract.craftableItems;
     }
 
     function createCraftableItem(
@@ -226,18 +130,23 @@ contract WorldOfBlastNft is ERC721URIStorage, Ownable {
         uint256 price,
         string memory rarity
     ) external onlyOwnerOrCreator {
-        craftingContract.createCraftableItem(
-            name,
-            description,
-            damage,
-            attackSpeed,
-            durability,
-            durabilityPerUse,
-            weaponType,
-            imageUrl,
-            price,
-            rarity
-        );
+        CraftingItem memory newItem = CraftingItem({
+            name: name,
+            description: description,
+            damage: damage,
+            attackSpeed: attackSpeed,
+            durability: durability,
+            durabilityPerUse: durabilityPerUse,
+            weaponType: weaponType,
+            imageUrl: imageUrl,
+            price: price,
+            rarity: rarity
+        });
+        craftingContract.craftableItems.push(newItem);
+        craftingContract.craftableItemIndex[
+            craftingContract.totalCraftableItems
+        ] = craftingContract.craftableItems.length - 1;
+        craftingContract.totalCraftableItems++;
     }
 
     function editCraftableItem(
@@ -253,83 +162,33 @@ contract WorldOfBlastNft is ERC721URIStorage, Ownable {
         uint256 price,
         string memory rarity
     ) external onlyOwnerOrCreator {
-        craftingContract.editCraftableItem(
-            itemId,
-            name,
-            description,
-            damage,
-            attackSpeed,
-            durability,
-            durabilityPerUse,
-            weaponType,
-            imageUrl,
-            price,
-            rarity
-        );
-    }
-
-    function getCraftableItem(uint256 itemId)
-        external
-        view
-        returns (string memory)
-    {
         require(
-            itemId < craftingContract.totalCraftableItems(),
-            "Index out of range"
+            itemId < craftingContract.totalCraftableItems,
+            "Item ID out of range"
         );
-        (
-            string memory name,
-            string memory description,
-            uint256 damage,
-            uint256 attackSpeed,
-            uint256 durability,
-            uint256 durabilityPerUse,
-            string memory weaponType,
-            string memory imageUrl,
-            uint256 price,
-            string memory rarity
-        ) = craftingContract.craftableItems(itemId);
-
-        string memory json = string(
-            abi.encodePacked(
-                '{"name": "',
-                name,
-                '", ',
-                '"description": "',
-                description,
-                '", ',
-                '"damage": ',
-                uint2str(damage),
-                ", ",
-                '"attackSpeed": ',
-                uint2str(attackSpeed),
-                ", ",
-                '"durability": ',
-                uint2str(durability),
-                ", ",
-                '"durabilityPerUse": ',
-                uint2str(durabilityPerUse),
-                ", ",
-                '"weaponType": "',
-                weaponType,
-                '", ',
-                '"imageUrl": "',
-                imageUrl,
-                '", ',
-                '"price": ',
-                uint2str(price),
-                ", ",
-                '"rarity": "',
-                rarity,
-                '"}'
-            )
-        );
-
-        return json;
+        uint256 index = craftingContract.craftableItemIndex[itemId];
+        CraftingItem storage craftableItem = craftingContract.craftableItems[
+            index
+        ];
+        craftableItem.name = name;
+        craftableItem.description = description;
+        craftableItem.damage = damage;
+        craftableItem.attackSpeed = attackSpeed;
+        craftableItem.durability = durability;
+        craftableItem.durabilityPerUse = durabilityPerUse;
+        craftableItem.weaponType = weaponType;
+        craftableItem.imageUrl = imageUrl;
+        craftableItem.price = price;
+        craftableItem.rarity = rarity;
     }
 
-    function deleteCraftableItem(uint256 itemId) external onlyOwner {
-        craftingContract.deleteCraftableItem(itemId);
+    function deleteCraftableItem(uint256 itemId) external onlyOwnerOrCreator {
+        require(
+            itemId < craftingContract.totalCraftableItems,
+            "Item ID out of range"
+        );
+        uint256 indexToDelete = craftingContract.craftableItemIndex[itemId];
+        delete craftingContract.craftableItems[indexToDelete];
     }
 
     function mint(uint256 craftableItemId, uint256 quantity)
@@ -337,38 +196,29 @@ contract WorldOfBlastNft is ERC721URIStorage, Ownable {
         onlyOwnerOrCreator
     {
         require(
-            craftableItemId < craftingContract.totalCraftableItems(),
+            craftableItemId < craftingContract.totalCraftableItems,
             "Invalid craftable item ID"
         );
-        (
-            string memory name,
-            string memory description,
-            uint256 damage,
-            uint256 attackSpeed,
-            uint256 durability,
-            uint256 durabilityPerUse,
-            string memory weaponType,
-            string memory imageUrl,
-            uint256 price,
-            string memory rarity
-        ) = craftingContract.craftableItems(craftableItemId);
+        CraftingItem memory craftableItem = craftingContract.craftableItems[
+            craftableItemId
+        ];
         for (uint256 i = 0; i < quantity; i++) {
             uint256 tokenId = tokenIdCounter++;
             items[tokenId] = Item(
-                name,
-                description,
-                damage,
-                attackSpeed,
-                durability,
-                durabilityPerUse,
-                weaponType,
-                imageUrl,
-                price,
-                rarity,
+                craftableItem.name,
+                craftableItem.description,
+                craftableItem.damage,
+                craftableItem.attackSpeed,
+                craftableItem.durability,
+                craftableItem.durabilityPerUse,
+                craftableItem.weaponType,
+                craftableItem.imageUrl,
+                craftableItem.price,
+                craftableItem.rarity,
                 false
             );
             _safeMint(msg.sender, tokenId);
-            _setTokenURI(tokenId, imageUrl);
+            _setTokenURI(tokenId, craftableItem.imageUrl);
             emit ItemCreated(tokenId, msg.sender);
         }
     }
@@ -380,12 +230,10 @@ contract WorldOfBlastNft is ERC721URIStorage, Ownable {
             WOB.balanceOf(msg.sender) >= priceWOB,
             "Insufficient WOB balance"
         );
-
         require(
             WOB.allowance(msg.sender, address(this)) >= priceWOB,
             "Insufficient allowance for WOB"
         );
-
         require(
             WOB.transferFrom(msg.sender, address(this), priceWOB),
             "Failed to transfer WOB"
@@ -396,36 +244,27 @@ contract WorldOfBlastNft is ERC721URIStorage, Ownable {
                 keccak256(abi.encodePacked(block.timestamp, tokenIdCounter))
             );
             uint256 craftableItemId = randomTokenId %
-                craftingContract.totalCraftableItems();
-            (
-                string memory name,
-                string memory description,
-                uint256 damage,
-                uint256 attackSpeed,
-                uint256 durability,
-                uint256 durabilityPerUse,
-                string memory weaponType,
-                string memory imageUrl,
-                uint256 price,
-                string memory rarity
-            ) = craftingContract.craftableItems(craftableItemId);
+                craftingContract.totalCraftableItems;
+            CraftingItem memory craftableItem = craftingContract.craftableItems[
+                craftableItemId
+            ];
 
             uint256 tokenId = tokenIdCounter++;
             items[tokenId] = Item(
-                name,
-                description,
-                damage,
-                attackSpeed,
-                durability,
-                durabilityPerUse,
-                weaponType,
-                imageUrl,
-                price,
-                rarity,
+                craftableItem.name,
+                craftableItem.description,
+                craftableItem.damage,
+                craftableItem.attackSpeed,
+                craftableItem.durability,
+                craftableItem.durabilityPerUse,
+                craftableItem.weaponType,
+                craftableItem.imageUrl,
+                craftableItem.price,
+                craftableItem.rarity,
                 false
             );
             _safeMint(msg.sender, tokenId);
-            _setTokenURI(tokenId, imageUrl);
+            _setTokenURI(tokenId, craftableItem.imageUrl);
             emit ItemCreated(tokenId, msg.sender);
         }
     }
