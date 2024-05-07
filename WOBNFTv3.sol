@@ -33,10 +33,10 @@ contract Crafting {
     event CraftableItemEdited(uint256 indexed itemId, Item craftableItem);
     event CraftableItemDeleted(uint256 indexed itemId);
 
-    modifier onlyOwner() {
+    modifier onlyOwnerOrCreator() {
         require(
-            msg.sender == owner,
-            "Only contract owner can call this function"
+            msg.sender == owner || creators[msg.sender],
+            "Only owner or creator"
         );
         _;
     }
@@ -46,11 +46,11 @@ contract Crafting {
         owner = msg.sender;
     }
 
-    function addCreator(address _creator) external onlyOwner {
+    function addCreator(address _creator) external onlyOwnerOrCreator {
         creators[_creator] = true;
     }
 
-    function removeCreator(address _creator) external onlyOwner {
+    function removeCreator(address _creator) external onlyOwnerOrCreator {
         creators[_creator] = false;
     }
 
@@ -65,7 +65,7 @@ contract Crafting {
         string memory imageUrl,
         uint256 price,
         string memory rarity
-    ) external onlyOwner {
+    ) external onlyOwnerOrCreator {
         Item memory newItem = Item({
             name: name,
             description: description,
@@ -96,7 +96,7 @@ contract Crafting {
         string memory imageUrl,
         uint256 price,
         string memory rarity
-    ) external onlyOwner {
+    ) external onlyOwnerOrCreator {
         require(itemId < totalCraftableItems, "Item ID out of range");
         uint256 index = craftableItemIndex[itemId];
         Item storage craftableItem = craftableItems[index];
@@ -113,7 +113,7 @@ contract Crafting {
         emit CraftableItemEdited(itemId, craftableItem);
     }
 
-    function deleteCraftableItem(uint256 itemId) external onlyOwner {
+    function deleteCraftableItem(uint256 itemId) external onlyOwnerOrCreator {
         require(itemId < totalCraftableItems, "Item ID out of range");
         uint256 indexToDelete = craftableItemIndex[itemId];
         delete craftableItems[indexToDelete];
