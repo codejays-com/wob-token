@@ -157,7 +157,7 @@ contract WorldOfBlastNft is ERC721URIStorage, Ownable {
         string rarity;
         bool isStaked;
     }
-
+    
     struct CraftingItem {
         string name;
         string description;
@@ -283,12 +283,55 @@ contract WorldOfBlastNft is ERC721URIStorage, Ownable {
         return craftingContract.craftableItems;
     }
 
-    function getCraftableItem(uint256 index)
+    function getCraftableItem(uint256 id)
         external
         view
-        returns (CraftingItem memory)
+        returns (string memory)
     {
-        return craftingContract.craftableItems[index];
+        require(
+            id < craftingContract.craftableItems.length,
+            "Craftable item does not exist"
+        );
+        uint256 index = craftingContract.craftableItemIndex[id];
+        CraftingItem storage craftableItem = craftingContract.craftableItems[
+            index
+        ];
+        string memory json = string(
+            abi.encodePacked(
+                '{"name": "',
+                craftableItem.name,
+                '", ',
+                '"description": "',
+                craftableItem.description,
+                '", ',
+                '"image": "',
+                craftableItem.imageUrl,
+                '", ',
+                '"attributes": {',
+                '"damage": ',
+                uint2str(craftableItem.damage),
+                ", ",
+                '"attackSpeed": ',
+                uint2str(craftableItem.attackSpeed),
+                ", ",
+                '"durability": ',
+                uint2str(craftableItem.durability),
+                ", ",
+                '"durabilityPerUse": ',
+                uint2str(craftableItem.durabilityPerUse),
+                ", ",
+                '"rarity": "',
+                craftableItem.rarity,
+                '", ',
+                '"weaponType": "',
+                craftableItem.weaponType,
+                '"',
+                "}, ",
+                '"external_link": "https://worldofblast.com"'
+                "}"
+            )
+        );
+        return json;
     }
 
     function createCraftableItem(
@@ -411,35 +454,96 @@ contract WorldOfBlastNft is ERC721URIStorage, Ownable {
             "Failed to transfer WOB"
         );
 
+        uint256 totalDurabilityInverse = 0;
+
+        for (uint256 i = 0; i < craftingContract.totalCraftableItems; i++) {
+            totalDurabilityInverse += (1 /
+                craftingContract.craftableItems[i].durability);
+        }
+
         for (uint256 i = 0; i < quantity; i++) {
             uint256 randomTokenId = uint256(
                 keccak256(abi.encodePacked(block.timestamp, tokenIdCounter))
             );
-            uint256 craftableItemId = randomTokenId %
-                craftingContract.totalCraftableItems;
-            CraftingItem memory craftableItem = craftingContract.craftableItems[
-                craftableItemId
-            ];
+            uint256 randomNumber = randomTokenId % totalDurabilityInverse;
+            uint256 cumulativeProbability = 0;
+            uint256 craftableItemId = 0;
 
+            while (randomNumber >= cumulativeProbability) {
+                cumulativeProbability += (1 /
+                    craftingContract
+                        .craftableItems[craftableItemId]
+                        .durability);
+                craftableItemId++;
+            }
+
+            CraftingItem memory selectedCraftableItem = craftingContract
+                .craftableItems[craftableItemId - 1];
             uint256 tokenId = tokenIdCounter++;
             items[tokenId] = Item(
-                craftableItem.name,
-                craftableItem.description,
-                craftableItem.damage,
-                craftableItem.attackSpeed,
-                craftableItem.durability,
-                craftableItem.durabilityPerUse,
-                craftableItem.weaponType,
-                craftableItem.imageUrl,
-                craftableItem.price,
-                craftableItem.rarity,
+                selectedCraftableItem.name,
+                selectedCraftableItem.description,
+                selectedCraftableItem.damage,
+                selectedCraftableItem.attackSpeed,
+                selectedCraftableItem.durability,
+                selectedCraftableItem.durabilityPerUse,
+                selectedCraftableItem.weaponType,
+                selectedCraftableItem.imageUrl,
+                selectedCraftableItem.price,
+                selectedCraftableItem.rarity,
                 false
             );
             _safeMint(msg.sender, tokenId);
-            _setTokenURI(tokenId, craftableItem.imageUrl);
+            _setTokenURI(tokenId, selectedCraftableItem.imageUrl);
             emit ItemCreated(tokenId, msg.sender);
         }
     }
+
+    // function mintWithWOB(uint256 quantity) external {
+    //     uint256 priceWOB = priceToCreateNftWOB * quantity;
+    //     require(
+    //         WOB.balanceOf(msg.sender) >= priceWOB,
+    //         "Insufficient WOB balance"
+    //     );
+    //     require(
+    //         WOB.allowance(msg.sender, address(this)) >= priceWOB,
+    //         "Insufficient allowance for WOB"
+    //     );
+    //     require(
+    //         WOB.transferFrom(msg.sender, address(this), priceWOB),
+    //         "Failed to transfer WOB"
+    //     );
+
+    //     for (uint256 i = 0; i < quantity; i++) {
+
+    //         uint256 randomTokenId = uint256(
+    //             keccak256(abi.encodePacked(block.timestamp, tokenIdCounter))
+    //         );
+    //         uint256 craftableItemId = randomTokenId %
+    //             craftingContract.totalCraftableItems;
+    //         CraftingItem memory craftableItem = craftingContract.craftableItems[
+    //             craftableItemId
+    //         ];
+
+    //         uint256 tokenId = tokenIdCounter++;
+    //         items[tokenId] = Item(
+    //             craftableItem.name,
+    //             craftableItem.description,
+    //             craftableItem.damage,
+    //             craftableItem.attackSpeed,
+    //             craftableItem.durability,
+    //             craftableItem.durabilityPerUse,
+    //             craftableItem.weaponType,
+    //             craftableItem.imageUrl,
+    //             craftableItem.price,
+    //             craftableItem.rarity,
+    //             false
+    //         );
+    //         _safeMint(msg.sender, tokenId);
+    //         _setTokenURI(tokenId, craftableItem.imageUrl);
+    //         emit ItemCreated(tokenId, msg.sender);
+    //     }
+    // }
 
     function updateItemDurability(uint256 tokenId, uint256 durability)
         external
