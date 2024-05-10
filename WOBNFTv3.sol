@@ -1,145 +1,10 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
-
 import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
 import "@openzeppelin/contracts/token/ERC721/extensions/ERC721URIStorage.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/utils/math/SafeMath.sol";
-
-interface IBlastPoints {
-    function configurePointsOperator(address operator) external;
-
-    function configurePointsOperatorOnBehalf(
-        address contractAddress,
-        address operator
-    ) external;
-}
-
-interface IBlast {
-    enum YieldMode {
-        AUTOMATIC,
-        VOID,
-        CLAIMABLE
-    }
-
-    enum GasMode {
-        VOID,
-        CLAIMABLE
-    }
-
-    function configureContract(
-        address contractAddress,
-        YieldMode _yield,
-        GasMode gasMode,
-        address governor
-    ) external;
-
-    function configure(
-        YieldMode _yield,
-        GasMode gasMode,
-        address governor
-    ) external;
-
-    function configureClaimableYield() external;
-
-    function configureClaimableYieldOnBehalf(address contractAddress) external;
-
-    function configureAutomaticYield() external;
-
-    function configureAutomaticYieldOnBehalf(address contractAddress) external;
-
-    function configureVoidYield() external;
-
-    function configureVoidYieldOnBehalf(address contractAddress) external;
-
-    function configureClaimableGas() external;
-
-    function configureClaimableGasOnBehalf(address contractAddress) external;
-
-    function configureVoidGas() external;
-
-    function configureVoidGasOnBehalf(address contractAddress) external;
-
-    function configureGovernor(address _governor) external;
-
-    function configureGovernorOnBehalf(
-        address _newGovernor,
-        address contractAddress
-    ) external;
-
-    // claim yield
-    function claimYield(
-        address contractAddress,
-        address recipientOfYield,
-        uint256 amount
-    ) external returns (uint256);
-
-    function claimAllYield(address contractAddress, address recipientOfYield)
-        external
-        returns (uint256);
-
-    // claim gas
-    function claimAllGas(address contractAddress, address recipientOfGas)
-        external
-        returns (uint256);
-
-    function claimGasAtMinClaimRate(
-        address contractAddress,
-        address recipientOfGas,
-        uint256 minClaimRateBips
-    ) external returns (uint256);
-
-    function claimMaxGas(address contractAddress, address recipientOfGas)
-        external
-        returns (uint256);
-
-    function claimGas(
-        address contractAddress,
-        address recipientOfGas,
-        uint256 gasToClaim,
-        uint256 gasSecondsToConsume
-    ) external returns (uint256);
-
-    function readClaimableYield(address contractAddress)
-        external
-        view
-        returns (uint256);
-
-    function readYieldConfiguration(address contractAddress)
-        external
-        view
-        returns (uint8);
-
-    function readGasParams(address contractAddress)
-        external
-        view
-        returns (
-            uint256 etherSeconds,
-            uint256 etherBalance,
-            uint256 lastUpdated,
-            GasMode
-        );
-}
-
-interface IERC20Rebasing {
-    enum YieldMode {
-        AUTOMATIC,
-        VOID,
-        CLAIMABLE
-    }
-
-    function configure(YieldMode) external returns (uint256);
-
-    function claim(address recipient, uint256 amount)
-        external
-        returns (uint256);
-
-    function getClaimableAmount(address account)
-        external
-        view
-        returns (uint256);
-}
 
 contract WorldOfBlastNft is ERC721URIStorage, Ownable {
     using SafeMath for uint256;
@@ -154,10 +19,9 @@ contract WorldOfBlastNft is ERC721URIStorage, Ownable {
         string weaponType;
         string imageUrl;
         uint256 price;
-        string rarity;
         bool isStaked;
     }
-    
+
     struct CraftingItem {
         string name;
         string description;
@@ -168,7 +32,7 @@ contract WorldOfBlastNft is ERC721URIStorage, Ownable {
         string weaponType;
         string imageUrl;
         uint256 price;
-        string rarity;
+        uint256 weightProbability;
     }
 
     struct Crafting {
@@ -178,25 +42,13 @@ contract WorldOfBlastNft is ERC721URIStorage, Ownable {
     }
 
     Crafting private craftingContract;
+
     IERC20 private WOB;
 
     address payable public _owner;
-    address public _pointsOperator;
 
     address public constant WOBTokenContract =
         0x0BCAEec9dF553b0E59a0928FCCd9dcf8C0b42601;
-
-    address public constant BLAST_CONTRACT =
-        0x4300000000000000000000000000000000000002;
-
-    address public constant blastPointsAddress =
-        0x2fc95838c71e76ec69ff817983BFf17c710F34E0;
-
-    IERC20Rebasing public constant USDB =
-        IERC20Rebasing(0x4200000000000000000000000000000000000022);
-
-    IERC20Rebasing public constant WETH =
-        IERC20Rebasing(0x4200000000000000000000000000000000000023);
 
     uint256 public priceToCreateNftWOB;
     uint256 private tokenIdCounter;
@@ -228,31 +80,6 @@ contract WorldOfBlastNft is ERC721URIStorage, Ownable {
         _owner = payable(msg.sender);
         _contractURI = "https://worldofblast.com/assets/contract.json";
         creators[msg.sender] = true;
-
-        _pointsOperator = msg.sender;
-
-        IBlast(BLAST_CONTRACT).configureAutomaticYield();
-        IBlast(BLAST_CONTRACT).configureClaimableYield();
-        IBlast(BLAST_CONTRACT).configureClaimableGas();
-        IBlast(BLAST_CONTRACT).configureGovernor(msg.sender);
-
-        USDB.configure(IERC20Rebasing.YieldMode.CLAIMABLE);
-        WETH.configure(IERC20Rebasing.YieldMode.CLAIMABLE);
-
-        IBlastPoints(blastPointsAddress).configurePointsOperator(
-            _pointsOperator
-        );
-    }
-
-    function setNewPointsOperator(address contractAddress, address newOperator)
-        external
-        onlyOwner
-    {
-        _pointsOperator = newOperator;
-        IBlastPoints(blastPointsAddress).configurePointsOperatorOnBehalf(
-            contractAddress,
-            newOperator
-        );
     }
 
     function withdrawWOB(address to, uint256 amount) external onlyOwner {
@@ -288,50 +115,32 @@ contract WorldOfBlastNft is ERC721URIStorage, Ownable {
         view
         returns (string memory)
     {
-        require(
-            id < craftingContract.craftableItems.length,
-            "Craftable item does not exist"
-        );
-        uint256 index = craftingContract.craftableItemIndex[id];
         CraftingItem storage craftableItem = craftingContract.craftableItems[
-            index
+            id
         ];
-        string memory json = string(
+        string memory itemData = string(
             abi.encodePacked(
-                '{"name": "',
                 craftableItem.name,
-                '", ',
-                '"description": "',
+                ";",
                 craftableItem.description,
-                '", ',
-                '"image": "',
-                craftableItem.imageUrl,
-                '", ',
-                '"attributes": {',
-                '"damage": ',
+                ";",
                 uint2str(craftableItem.damage),
-                ", ",
-                '"attackSpeed": ',
+                ";",
                 uint2str(craftableItem.attackSpeed),
-                ", ",
-                '"durability": ',
+                ";",
                 uint2str(craftableItem.durability),
-                ", ",
-                '"durabilityPerUse": ',
+                ";",
                 uint2str(craftableItem.durabilityPerUse),
-                ", ",
-                '"rarity": "',
-                craftableItem.rarity,
-                '", ',
-                '"weaponType": "',
+                ";",
                 craftableItem.weaponType,
-                '"',
-                "}, ",
-                '"external_link": "https://worldofblast.com"'
-                "}"
+                ";",
+                craftableItem.imageUrl,
+                ";",
+                ";",
+                uint2str(craftableItem.weightProbability)
             )
         );
-        return json;
+        return itemData;
     }
 
     function createCraftableItem(
@@ -344,7 +153,7 @@ contract WorldOfBlastNft is ERC721URIStorage, Ownable {
         string memory weaponType,
         string memory imageUrl,
         uint256 price,
-        string memory rarity
+        uint256 weightProbability
     ) external onlyCreator {
         CraftingItem memory newItem = CraftingItem({
             name: name,
@@ -356,7 +165,7 @@ contract WorldOfBlastNft is ERC721URIStorage, Ownable {
             weaponType: weaponType,
             imageUrl: imageUrl,
             price: price,
-            rarity: rarity
+            weightProbability: weightProbability
         });
         craftingContract.craftableItems.push(newItem);
         craftingContract.craftableItemIndex[
@@ -376,7 +185,7 @@ contract WorldOfBlastNft is ERC721URIStorage, Ownable {
         string memory weaponType,
         string memory imageUrl,
         uint256 price,
-        string memory rarity
+        uint256 weightProbability
     ) external onlyCreator {
         require(
             itemId < craftingContract.totalCraftableItems,
@@ -395,7 +204,7 @@ contract WorldOfBlastNft is ERC721URIStorage, Ownable {
         craftableItem.weaponType = weaponType;
         craftableItem.imageUrl = imageUrl;
         craftableItem.price = price;
-        craftableItem.rarity = rarity;
+        craftableItem.weightProbability = weightProbability;
     }
 
     function deleteCraftableItem(uint256 itemId) external onlyOwner {
@@ -430,7 +239,6 @@ contract WorldOfBlastNft is ERC721URIStorage, Ownable {
                 craftableItem.weaponType,
                 craftableItem.imageUrl,
                 craftableItem.price,
-                craftableItem.rarity,
                 false
             );
             _safeMint(msg.sender, tokenId);
@@ -439,47 +247,56 @@ contract WorldOfBlastNft is ERC721URIStorage, Ownable {
         }
     }
 
-    function mintWithWOB(uint256 quantity) external {
+    function mintWithWOB(uint256 quantity) external returns (uint256[] memory) {
         uint256 priceWOB = priceToCreateNftWOB * quantity;
         require(
             WOB.balanceOf(msg.sender) >= priceWOB,
             "Insufficient WOB balance"
         );
         require(
-            WOB.allowance(msg.sender, address(this)) >= priceWOB,
-            "Insufficient allowance for WOB"
-        );
-        require(
             WOB.transferFrom(msg.sender, address(this), priceWOB),
             "Failed to transfer WOB"
         );
 
-        uint256 totalDurabilityInverse = 0;
+        require(
+            craftingContract.totalCraftableItems > 0,
+            "No craftable items available"
+        );
 
-        for (uint256 i = 0; i < craftingContract.totalCraftableItems; i++) {
-            totalDurabilityInverse += (1 /
-                craftingContract.craftableItems[i].durability);
+        uint256 totalweightProbability = 0;
+        for (uint256 x = 0; x < craftingContract.totalCraftableItems; x++) {
+            totalweightProbability += craftingContract
+                .craftableItems[x]
+                .weightProbability;
         }
 
-        for (uint256 i = 0; i < quantity; i++) {
-            uint256 randomTokenId = uint256(
-                keccak256(abi.encodePacked(block.timestamp, tokenIdCounter))
-            );
-            uint256 randomNumber = randomTokenId % totalDurabilityInverse;
-            uint256 cumulativeProbability = 0;
-            uint256 craftableItemId = 0;
+        uint256[] memory itemIds = new uint256[](quantity);
+        uint256 cumulativeWeight = 0;
 
-            while (randomNumber >= cumulativeProbability) {
-                cumulativeProbability += (1 /
-                    craftingContract
-                        .craftableItems[craftableItemId]
-                        .durability);
-                craftableItemId++;
+        for (uint256 i = 0; i < quantity; i++) {
+            uint256 randomNumber = uint256(
+                keccak256(abi.encodePacked(block.timestamp, tokenIdCounter, i))
+            ) % totalweightProbability;
+
+            uint256 selectedItemId;
+
+            for (
+                uint256 itemId = 0;
+                itemId < craftingContract.totalCraftableItems;
+                itemId++
+            ) {
+                cumulativeWeight += craftingContract
+                    .craftableItems[itemId]
+                    .weightProbability;
+                if (randomNumber < cumulativeWeight) {
+                    selectedItemId = itemId;
+                    break;
+                }
             }
 
-            CraftingItem memory selectedCraftableItem = craftingContract
-                .craftableItems[craftableItemId - 1];
             uint256 tokenId = tokenIdCounter++;
+            CraftingItem memory selectedCraftableItem = craftingContract
+                .craftableItems[selectedItemId];
             items[tokenId] = Item(
                 selectedCraftableItem.name,
                 selectedCraftableItem.description,
@@ -490,60 +307,15 @@ contract WorldOfBlastNft is ERC721URIStorage, Ownable {
                 selectedCraftableItem.weaponType,
                 selectedCraftableItem.imageUrl,
                 selectedCraftableItem.price,
-                selectedCraftableItem.rarity,
                 false
             );
+            itemIds[i] = tokenId;
             _safeMint(msg.sender, tokenId);
             _setTokenURI(tokenId, selectedCraftableItem.imageUrl);
             emit ItemCreated(tokenId, msg.sender);
         }
+        return itemIds;
     }
-
-    // function mintWithWOB(uint256 quantity) external {
-    //     uint256 priceWOB = priceToCreateNftWOB * quantity;
-    //     require(
-    //         WOB.balanceOf(msg.sender) >= priceWOB,
-    //         "Insufficient WOB balance"
-    //     );
-    //     require(
-    //         WOB.allowance(msg.sender, address(this)) >= priceWOB,
-    //         "Insufficient allowance for WOB"
-    //     );
-    //     require(
-    //         WOB.transferFrom(msg.sender, address(this), priceWOB),
-    //         "Failed to transfer WOB"
-    //     );
-
-    //     for (uint256 i = 0; i < quantity; i++) {
-
-    //         uint256 randomTokenId = uint256(
-    //             keccak256(abi.encodePacked(block.timestamp, tokenIdCounter))
-    //         );
-    //         uint256 craftableItemId = randomTokenId %
-    //             craftingContract.totalCraftableItems;
-    //         CraftingItem memory craftableItem = craftingContract.craftableItems[
-    //             craftableItemId
-    //         ];
-
-    //         uint256 tokenId = tokenIdCounter++;
-    //         items[tokenId] = Item(
-    //             craftableItem.name,
-    //             craftableItem.description,
-    //             craftableItem.damage,
-    //             craftableItem.attackSpeed,
-    //             craftableItem.durability,
-    //             craftableItem.durabilityPerUse,
-    //             craftableItem.weaponType,
-    //             craftableItem.imageUrl,
-    //             craftableItem.price,
-    //             craftableItem.rarity,
-    //             false
-    //         );
-    //         _safeMint(msg.sender, tokenId);
-    //         _setTokenURI(tokenId, craftableItem.imageUrl);
-    //         emit ItemCreated(tokenId, msg.sender);
-    //     }
-    // }
 
     function updateItemDurability(uint256 tokenId, uint256 durability)
         external
@@ -610,9 +382,6 @@ contract WorldOfBlastNft is ERC721URIStorage, Ownable {
                 '"durabilityPerUse": ',
                 uint2str(items[tokenId].durabilityPerUse),
                 ", ",
-                '"rarity": "',
-                items[tokenId].rarity,
-                '", ',
                 '"weaponType": "',
                 items[tokenId].weaponType,
                 '"',
