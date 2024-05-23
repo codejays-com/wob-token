@@ -7,12 +7,14 @@ import "@openzeppelin/contracts/utils/math/SafeMath.sol";
 
 contract WorldOfBlastLocation is ERC721URIStorage, Ownable {
     using SafeMath for uint256;
+
     struct Monster {
         uint256 id;
         string name;
         string img;
         uint256 hp;
         uint256 weight;
+        uint256 damage;
     }
 
     string private _contractURI;
@@ -26,7 +28,8 @@ contract WorldOfBlastLocation is ERC721URIStorage, Ownable {
         string name,
         string img,
         uint256 hp,
-        uint256 weight
+        uint256 weight,
+        uint256 damage
     );
 
     constructor(
@@ -51,13 +54,29 @@ contract WorldOfBlastLocation is ERC721URIStorage, Ownable {
         string memory _name,
         string memory _img,
         uint256 _hp,
-        uint256 _weight
+        uint256 _weight,
+        uint256 _damage
     ) external onlyOwner {
         uint256 monsterId = monsterIdCounter++;
         _safeMint(msg.sender, monsterId);
         _setTokenURI(monsterId, _img);
-        monsters[monsterId] = Monster(monsterId, _name, _img, _hp, _weight);
-        emit MonsterMinted(msg.sender, monsterId, _name, _img, _hp, _weight);
+        monsters[monsterId] = Monster(
+            monsterId,
+            _name,
+            _img,
+            _hp,
+            _weight,
+            _damage
+        );
+        emit MonsterMinted(
+            msg.sender,
+            monsterId,
+            _name,
+            _img,
+            _hp,
+            _weight,
+            _damage
+        );
     }
 
     function getAllMonsters() public view returns (Monster[] memory) {
@@ -93,6 +112,33 @@ contract WorldOfBlastLocation is ERC721URIStorage, Ownable {
         revert("No monster selected");
     }
 
+    function updateImage(uint256 tokenId, string memory imageUrl)
+        external
+        onlyOwner
+    {
+        _setTokenURI(tokenId, imageUrl);
+        monsters[tokenId].img = imageUrl;
+    }
+
+    function updateWeight(uint256 tokenId, uint256 weight) external onlyOwner {
+        monsters[tokenId].weight = weight;
+    }
+
+    function updateHp(uint256 tokenId, uint256 hp) external onlyOwner {
+        monsters[tokenId].hp = hp;
+    }
+
+    function updateDamage(uint256 tokenId, uint256 damage) external onlyOwner {
+        monsters[tokenId].damage = damage;
+    }
+
+    function updateName(uint256 tokenId, string memory name)
+        external
+        onlyOwner
+    {
+        monsters[tokenId].name = name;
+    }
+
     function tokenURI(uint256 tokenId)
         public
         view
@@ -115,6 +161,9 @@ contract WorldOfBlastLocation is ERC721URIStorage, Ownable {
                 ", ",
                 '"weight": ',
                 uint2str(monster.weight),
+                ", ",
+                '"damage": ',
+                uint2str(monster.damage),
                 "}",
                 ", ",
                 '"external_link": "https://worldofblast.com"'
