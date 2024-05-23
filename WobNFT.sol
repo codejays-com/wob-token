@@ -1,160 +1,13 @@
-//SPDX-License-Identifier: MIT
+// SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
-
 import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
 import "@openzeppelin/contracts/token/ERC721/extensions/ERC721URIStorage.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/utils/math/SafeMath.sol";
 
-interface IBlastPoints {
-    function configurePointsOperator(address operator) external;
-
-    function configurePointsOperatorOnBehalf(
-        address contractAddress,
-        address operator
-    ) external;
-}
-
-interface IBlast {
-    enum YieldMode {
-        AUTOMATIC,
-        VOID,
-        CLAIMABLE
-    }
-
-    enum GasMode {
-        VOID,
-        CLAIMABLE
-    }
-
-    // configure
-    function configureContract(
-        address contractAddress,
-        YieldMode _yield,
-        GasMode gasMode,
-        address governor
-    ) external;
-
-    function configure(
-        YieldMode _yield,
-        GasMode gasMode,
-        address governor
-    ) external;
-
-    // base configuration options
-    function configureClaimableYield() external;
-
-    function configureClaimableYieldOnBehalf(address contractAddress) external;
-
-    function configureAutomaticYield() external;
-
-    function configureAutomaticYieldOnBehalf(address contractAddress) external;
-
-    function configureVoidYield() external;
-
-    function configureVoidYieldOnBehalf(address contractAddress) external;
-
-    function configureClaimableGas() external;
-
-    function configureClaimableGasOnBehalf(address contractAddress) external;
-
-    function configureVoidGas() external;
-
-    function configureVoidGasOnBehalf(address contractAddress) external;
-
-    function configureGovernor(address _governor) external;
-
-    function configureGovernorOnBehalf(
-        address _newGovernor,
-        address contractAddress
-    ) external;
-
-    // claim yield
-    function claimYield(
-        address contractAddress,
-        address recipientOfYield,
-        uint256 amount
-    ) external returns (uint256);
-
-    function claimAllYield(address contractAddress, address recipientOfYield)
-        external
-        returns (uint256);
-
-    // claim gas
-    function claimAllGas(address contractAddress, address recipientOfGas)
-        external
-        returns (uint256);
-
-    function claimGasAtMinClaimRate(
-        address contractAddress,
-        address recipientOfGas,
-        uint256 minClaimRateBips
-    ) external returns (uint256);
-
-    function claimMaxGas(address contractAddress, address recipientOfGas)
-        external
-        returns (uint256);
-
-    function claimGas(
-        address contractAddress,
-        address recipientOfGas,
-        uint256 gasToClaim,
-        uint256 gasSecondsToConsume
-    ) external returns (uint256);
-
-    // read functions
-    function readClaimableYield(address contractAddress)
-        external
-        view
-        returns (uint256);
-
-    function readYieldConfiguration(address contractAddress)
-        external
-        view
-        returns (uint8);
-
-    function readGasParams(address contractAddress)
-        external
-        view
-        returns (
-            uint256 etherSeconds,
-            uint256 etherBalance,
-            uint256 lastUpdated,
-            GasMode
-        );
-}
-
-interface IERC20Rebasing {
-    enum YieldMode {
-        AUTOMATIC,
-        VOID,
-        CLAIMABLE
-    }
-
-    // changes the yield mode of the caller and update the balance
-    // to reflect the configuration
-    function configure(YieldMode) external returns (uint256);
-
-    // "claimable" yield mode accounts can call this this claim their yield
-    // to another address
-    function claim(address recipient, uint256 amount)
-        external
-        returns (uint256);
-
-    // read the claimable amount for an account
-    function getClaimableAmount(address account)
-        external
-        view
-        returns (uint256);
-}
-
-contract WorldOfBlast is ERC721URIStorage, Ownable {
+contract WorldOfBlastNft is ERC721URIStorage, Ownable {
     using SafeMath for uint256;
-
-    address private _operator;
-    address payable public _owner;
-    address public pointsOperator;
 
     struct Item {
         string name;
@@ -162,71 +15,59 @@ contract WorldOfBlast is ERC721URIStorage, Ownable {
         uint256 damage;
         uint256 attackSpeed;
         uint256 durability;
-        uint256 maxDurability;
         uint256 durabilityPerUse;
         string weaponType;
         string imageUrl;
         uint256 price;
+        bool isStaked;
     }
 
+    struct CraftingItem {
+        uint256 id;
+        string name;
+        string description;
+        uint256 damage;
+        uint256 attackSpeed;
+        uint256 durability;
+        uint256 durabilityPerUse;
+        string weaponType;
+        string imageUrl;
+        uint256 price;
+        uint256 weightProbability;
+    }
+
+    struct Crafting {
+        CraftingItem[] craftableItems;
+        mapping(uint256 => uint256) craftableItemIndex;
+        uint256 totalCraftableItems;
+    }
+
+    Crafting private craftingContract;
+
     IERC20 private WOB;
-    uint256 private tokenIdCounter;
-    string private _baseTokenURI;
+
+    address payable public _owner;
 
     address public constant WOBTokenContract =
-        0x71B54fd9F928FF10D5990f80D1E19c2BC866a821;
+        0x0BCAEec9dF553b0E59a0928FCCd9dcf8C0b42601;
 
-    address public constant BLAST_CONTRACT =
-        0x4300000000000000000000000000000000000002;
-
-    /*********************** BLAST MAINNET **********************
-    address public constant blastPointsAddress =
-    0x2536FE9ab3F511540F2f9e2eC2A805005C3Dd800;
-    IERC20Rebasing public constant USDB =
-    IERC20Rebasing(0x4300000000000000000000000000000000000003);
-    IERC20Rebasing public constant WETH =
-    IERC20Rebasing(0x4300000000000000000000000000000000000004);
-    */
-
-    /*********************** BLAST TESTNET ***********************/
-    address public constant blastPointsAddress =
-        0x2fc95838c71e76ec69ff817983BFf17c710F34E0;
-    IERC20Rebasing public constant USDB =
-        IERC20Rebasing(0x4200000000000000000000000000000000000022);
-    IERC20Rebasing public constant WETH =
-        IERC20Rebasing(0x4200000000000000000000000000000000000023);
+    uint256 public priceToCreateNftWOB;
+    uint256 private tokenIdCounter;
+    uint256 private craftingItemIdCounter;
+    string private _contractURI;
 
     mapping(uint256 => Item) private items;
-    mapping(uint256 => bool) private isForSale;
-    mapping(uint256 => string) private tokenURIs;
-    mapping(address => bool) private creators;
+    mapping(address => bool) public creators;
+    mapping(address => mapping(uint256 => bool))
+        private authorizedContractsByItem;
 
     event ItemCreated(uint256 indexed tokenId, address indexed owner);
-
-    event ItemListedForSale(
+    event ItemUpdated(uint256 indexed tokenId, uint256 durability);
+    event InBattleSet(uint256 indexed tokenId, bool value);
+    event AuthorizedContract(
+        address indexed contractAddress,
         uint256 indexed tokenId,
-        address indexed owner,
-        uint256 price
-    );
-
-    event ItemDelistedFromSale(uint256 indexed tokenId, address indexed owner);
-
-    event ItemPurchased(
-        uint256 indexed tokenId,
-        address indexed buyer,
-        address indexed seller,
-        uint256 price
-    );
-
-    event ItemUpdated(uint256 indexed tokenId, address indexed owner);
-
-    event ItemUpdatedDescription(uint256 indexed tokenId, string description);
-
-    event ItemUpdatedDurability(uint256 indexed tokenId, uint256 durability);
-
-    event OperatorTransferred(
-        address indexed previousOperator,
-        address indexed newOperator
+        bool authorized
     );
 
     modifier onlyTokenOwner(uint256 tokenId) {
@@ -237,287 +78,273 @@ contract WorldOfBlast is ERC721URIStorage, Ownable {
         _;
     }
 
-    modifier onlyOperator() {
-        require(msg.sender == _owner, "Only the operator");
-        _;
-    }
-
-    modifier onlyCreator() {
+    modifier onlyAuthorizedContract(uint256 tokenId) {
         require(
-            creators[msg.sender],
-            "Only authorized creator can perform this action"
+            authorizedContractsByItem[msg.sender][tokenId],
+            "Not authorized to edit this item"
         );
         _;
     }
 
     constructor() ERC721("World Of Blast", "WOBNFTs") Ownable(msg.sender) {
         WOB = IERC20(WOBTokenContract);
-
         _owner = payable(msg.sender);
-        _operator = msg.sender;
-
+        _contractURI = "https://worldofblast.com/assets/contract.json";
         creators[msg.sender] = true;
-
-        pointsOperator = msg.sender;
-
-        IBlast(BLAST_CONTRACT).configureAutomaticYield();
-        IBlast(BLAST_CONTRACT).configureClaimableYield();
-        IBlast(BLAST_CONTRACT).configureClaimableGas();
-        IBlast(BLAST_CONTRACT).configureGovernor(msg.sender);
-
-        USDB.configure(IERC20Rebasing.YieldMode.CLAIMABLE);
-
-        WETH.configure(IERC20Rebasing.YieldMode.CLAIMABLE);
-
-        IBlastPoints(blastPointsAddress).configurePointsOperator(
-            pointsOperator
-        );
-
-        emit OperatorTransferred(address(0), _operator);
     }
 
-    /*********************** BLAST ***********************/
-    function setNewPointsOperator(address contractAddress, address newOperator)
-        external
-        onlyOwner
-    {
-        pointsOperator = newOperator;
-        IBlastPoints(blastPointsAddress).configurePointsOperatorOnBehalf(
-            contractAddress,
-            newOperator
-        );
+    function withdrawWOB(address to, uint256 amount) external onlyOwner {
+        require(WOB.transfer(to, amount), "Failed to transfer WOB");
     }
 
-    function configureYieldModeTokens(
-        IERC20Rebasing.YieldMode _weth,
-        IERC20Rebasing.YieldMode _usdb
-    ) external onlyOperator {
-        USDB.configure(_usdb);
-        WETH.configure(_weth);
+    function contractURI() public view returns (string memory) {
+        return _contractURI;
     }
 
-    function claimYieldTokens(address recipient, uint256 amount)
-        external
-        onlyOperator
-    {
-        USDB.claim(recipient, amount);
-        WETH.claim(recipient, amount);
+    function updatePriceToCreateNftWOB(uint256 price) external onlyOwner {
+        priceToCreateNftWOB = price;
     }
 
-    function claimYield(address recipient, uint256 amount)
-        external
-        onlyOperator
-    {
-        IBlast(BLAST_CONTRACT).claimYield(address(this), recipient, amount);
-    }
-
-    function claimAllYield(address recipient) external onlyOperator {
-        IBlast(BLAST_CONTRACT).claimAllYield(address(this), recipient);
-    }
-
-    function configureGovernorOnBehalf(
-        address _newGovernor,
-        address contractAddress
-    ) public onlyOwner {
-        IBlast(BLAST_CONTRACT).configureGovernorOnBehalf(
-            _newGovernor,
-            contractAddress
-        );
-        emit OperatorTransferred(_operator, _newGovernor);
-        _operator = _newGovernor;
-    }
-
-    // claim gas start
-    function claimGasAtMinClaimRate(
-        address contractAddress,
-        address recipientOfGas,
-        uint256 minClaimRateBips
-    ) external onlyOwner returns (uint256) {
-        return
-            IBlast(BLAST_CONTRACT).claimGasAtMinClaimRate(
-                contractAddress,
-                recipientOfGas,
-                minClaimRateBips
-            );
-    }
-
-    function claimMaxGas(address contractAddress, address recipientOfGas)
-        external
-        onlyOwner
-        returns (uint256)
-    {
-        return
-            IBlast(BLAST_CONTRACT).claimMaxGas(contractAddress, recipientOfGas);
-    }
-
-    function claimGas(
-        address contractAddress,
-        address recipientOfGas,
-        uint256 gasToClaim,
-        uint256 gasSecondsToConsume
-    ) external onlyOwner returns (uint256) {
-        return
-            IBlast(BLAST_CONTRACT).claimGas(
-                contractAddress,
-                recipientOfGas,
-                gasToClaim,
-                gasSecondsToConsume
-            );
-    }
-
-    // read functions
-    function readClaimableYield(address contractAddress)
+    function getAllCraftableItems()
         external
         view
-        returns (uint256)
+        returns (CraftingItem[] memory)
     {
-        return IBlast(BLAST_CONTRACT).readClaimableYield(contractAddress);
+        return craftingContract.craftableItems;
     }
 
-    function readYieldConfiguration(address contractAddress)
+    function getCraftableItem(uint256 id)
         external
         view
-        returns (uint8)
+        returns (string memory)
     {
-        return IBlast(BLAST_CONTRACT).readYieldConfiguration(contractAddress);
+        uint256 index = craftingContract.craftableItemIndex[id];
+        CraftingItem storage craftableItem = craftingContract.craftableItems[
+            index
+        ];
+        string memory itemData = string(
+            abi.encodePacked(
+                craftableItem.name,
+                ";",
+                craftableItem.description,
+                ";",
+                uint2str(craftableItem.damage),
+                ";",
+                uint2str(craftableItem.attackSpeed),
+                ";",
+                uint2str(craftableItem.durability),
+                ";",
+                uint2str(craftableItem.durabilityPerUse),
+                ";",
+                craftableItem.weaponType,
+                ";",
+                craftableItem.imageUrl,
+                ";",
+                ";",
+                uint2str(craftableItem.weightProbability)
+            )
+        );
+        return itemData;
     }
 
-    function Mint(
+    function createCraftableItem(
         string memory name,
         string memory description,
         uint256 damage,
         uint256 attackSpeed,
         uint256 durability,
-        uint256 maxDurability,
         uint256 durabilityPerUse,
         string memory weaponType,
         string memory imageUrl,
         uint256 price,
-        uint256 quantity
-    ) external onlyCreator {
+        uint256 weightProbability
+    ) external {
+        uint256 newItemId = craftingItemIdCounter++;
+        CraftingItem memory newItem = CraftingItem({
+            id: newItemId,
+            name: name,
+            description: description,
+            damage: damage,
+            attackSpeed: attackSpeed,
+            durability: durability,
+            durabilityPerUse: durabilityPerUse,
+            weaponType: weaponType,
+            imageUrl: imageUrl,
+            price: price,
+            weightProbability: weightProbability
+        });
+        craftingContract.craftableItems.push(newItem);
+        craftingContract.craftableItemIndex[newItemId] =
+            craftingContract.craftableItems.length -
+            1;
+        craftingContract.totalCraftableItems++;
+    }
+
+    function editCraftableItem(
+        uint256 itemId,
+        string memory name,
+        string memory description,
+        uint256 damage,
+        uint256 attackSpeed,
+        uint256 durability,
+        uint256 durabilityPerUse,
+        string memory weaponType,
+        string memory imageUrl,
+        uint256 price,
+        uint256 weightProbability
+    ) external {
+        require(
+            craftingContract.craftableItemIndex[itemId] <
+                craftingContract.totalCraftableItems,
+            "Item ID out of range"
+        );
+        uint256 index = craftingContract.craftableItemIndex[itemId];
+        CraftingItem storage craftableItem = craftingContract.craftableItems[
+            index
+        ];
+        craftableItem.name = name;
+        craftableItem.description = description;
+        craftableItem.damage = damage;
+        craftableItem.attackSpeed = attackSpeed;
+        craftableItem.durability = durability;
+        craftableItem.durabilityPerUse = durabilityPerUse;
+        craftableItem.weaponType = weaponType;
+        craftableItem.imageUrl = imageUrl;
+        craftableItem.price = price;
+        craftableItem.weightProbability = weightProbability;
+    }
+
+    function deleteCraftableItem(uint256 itemId) external onlyOwner {
+        require(
+            craftingContract.craftableItemIndex[itemId] <
+                craftingContract.totalCraftableItems,
+            "Item ID out of range"
+        );
+        uint256 indexToDelete = craftingContract.craftableItemIndex[itemId];
+        uint256 lastIndex = craftingContract.craftableItems.length - 1;
+
+        if (indexToDelete != lastIndex) {
+            CraftingItem storage lastItem = craftingContract.craftableItems[
+                lastIndex
+            ];
+            craftingContract.craftableItems[indexToDelete] = lastItem;
+            craftingContract.craftableItemIndex[lastItem.id] = indexToDelete;
+        }
+
+        craftingContract.craftableItems.pop();
+        delete craftingContract.craftableItemIndex[itemId];
+        craftingContract.totalCraftableItems--;
+    }
+
+    function mint(uint256 craftableItemId, uint256 quantity) external {
+        require(
+            craftingContract.craftableItemIndex[craftableItemId] <
+                craftingContract.totalCraftableItems,
+            "Invalid craftable item ID"
+        );
+        uint256 index = craftingContract.craftableItemIndex[craftableItemId];
+        CraftingItem memory craftableItem = craftingContract.craftableItems[
+            index
+        ];
         for (uint256 i = 0; i < quantity; i++) {
-            uint256 tokenId = tokenIdCounter;
-            tokenIdCounter++;
+            uint256 tokenId = tokenIdCounter++;
             items[tokenId] = Item(
-                name,
-                description,
-                damage,
-                attackSpeed,
-                maxDurability,
-                durability,
-                durabilityPerUse,
-                weaponType,
-                imageUrl,
-                price
+                craftableItem.name,
+                craftableItem.description,
+                craftableItem.damage,
+                craftableItem.attackSpeed,
+                craftableItem.durability,
+                craftableItem.durabilityPerUse,
+                craftableItem.weaponType,
+                craftableItem.imageUrl,
+                craftableItem.price,
+                false
             );
             _safeMint(msg.sender, tokenId);
-            _setTokenURI(tokenId, imageUrl);
+            _setTokenURI(tokenId, craftableItem.imageUrl);
             emit ItemCreated(tokenId, msg.sender);
         }
     }
 
-    function listItemForSale(uint256 tokenId, uint256 price)
-        external
-        onlyTokenOwner(tokenId)
-    {
-        isForSale[tokenId] = true;
-        emit ItemListedForSale(tokenId, ownerOf(tokenId), price);
-    }
-
-    function delistItemForSale(uint256 tokenId)
-        external
-        onlyTokenOwner(tokenId)
-    {
-        isForSale[tokenId] = false;
-        emit ItemDelistedFromSale(tokenId, ownerOf(tokenId));
-    }
-
-    function buyItem(uint256 tokenId) external {
-        address seller = ownerOf(tokenId);
-        address buyer = msg.sender;
-        uint256 price = items[tokenId].price;
-
-        require(isForSale[tokenId], "Item is not listed for sale");
-        require(balanceOf(seller) > 0, "Seller does not own the token");
+    function mintWithWOB(uint256 quantity) external returns (uint256[] memory) {
+        uint256 priceWOB = priceToCreateNftWOB * quantity;
         require(
-            WOB.allowance(buyer, address(this)) >= price,
-            "Insufficient allowance"
+            WOB.balanceOf(msg.sender) >= priceWOB,
+            "Insufficient WOB balance"
         );
-
-        // Ensure buyer pays the correct amount of tokens
         require(
-            WOB.transferFrom(buyer, seller, price),
-            "Token transfer failed"
+            WOB.transferFrom(msg.sender, address(this), priceWOB),
+            "Failed to transfer WOB"
         );
 
-        // Transfer the NFT to the buyer
-        _transfer(seller, buyer, tokenId);
-
-        // Mark the item as not for sale
-        isForSale[tokenId] = false;
-        emit ItemPurchased(tokenId, buyer, seller, price);
-    }
-
-    function updateTokenURI(uint256 tokenId, string memory newTokenURI)
-        external
-        onlyOwner
-    {
-        require(balanceOf(ownerOf(tokenId)) > 0, "Token ID does not exist");
-        _setTokenURI(tokenId, newTokenURI);
-        tokenURIs[tokenId] = newTokenURI;
-        Item storage item = items[tokenId];
-        item.imageUrl = newTokenURI;
-        emit ItemUpdated(tokenId, ownerOf(tokenId));
-    }
-
-    function updateTokenDescription(uint256 tokenId, string memory description)
-        external
-        onlyOwner
-    {
-        require(balanceOf(ownerOf(tokenId)) > 0, "Token ID does not exist");
-        items[tokenId].description = description;
-        emit ItemUpdatedDescription(tokenId, description);
-    }
-
-    function updateItemDurability(uint256 tokenId, uint256 newDurability)
-        external
-        onlyOwner
-    {
-        require(balanceOf(ownerOf(tokenId)) > 0, "Token ID does not exist");
-        Item storage item = items[tokenId];
-        item.durability = newDurability;
-        emit ItemUpdatedDurability(tokenId, newDurability);
-    }
-
-    function getItem(uint256 tokenId)
-        external
-        view
-        returns (
-            string memory name,
-            string memory description,
-            uint256 damage,
-            uint256 attackSpeed,
-            uint256 maxDurability,
-            uint256 durability,
-            uint256 durabilityPerUse,
-            string memory weaponType,
-            string memory imageUrl,
-            uint256 price
-        )
-    {
-        Item storage item = items[tokenId];
-        return (
-            item.name,
-            item.description,
-            item.damage,
-            item.attackSpeed,
-            item.maxDurability,
-            item.durability,
-            item.durabilityPerUse,
-            item.weaponType,
-            item.imageUrl,
-            item.price
+        require(
+            craftingContract.totalCraftableItems > 0,
+            "No craftable items available"
         );
+
+        uint256 totalweightProbability = 0;
+        CraftingItem[] memory craftableItems = craftingContract.craftableItems;
+        uint256 totalItems = craftableItems.length;
+
+        for (uint256 x = 0; x < totalItems; x++) {
+            totalweightProbability += craftableItems[x].weightProbability;
+        }
+
+        uint256[] memory itemIds = new uint256[](quantity);
+        uint256 cumulativeWeight;
+        uint256 tokenId;
+        uint256 randomNumber;
+
+        for (uint256 i = 0; i < quantity; i++) {
+            randomNumber =
+                uint256(
+                    keccak256(
+                        abi.encodePacked(block.timestamp, tokenIdCounter, i)
+                    )
+                ) %
+                totalweightProbability;
+            cumulativeWeight = 0;
+
+            uint256 selectedItemId;
+            for (uint256 itemId = 0; itemId < totalItems; itemId++) {
+                cumulativeWeight += craftableItems[itemId].weightProbability;
+                if (randomNumber < cumulativeWeight) {
+                    selectedItemId = itemId;
+                    break;
+                }
+            }
+
+            tokenId = tokenIdCounter++;
+            CraftingItem memory selectedCraftableItem = craftableItems[
+                selectedItemId
+            ];
+            items[tokenId] = Item(
+                selectedCraftableItem.name,
+                selectedCraftableItem.description,
+                selectedCraftableItem.damage,
+                selectedCraftableItem.attackSpeed,
+                selectedCraftableItem.durability,
+                selectedCraftableItem.durabilityPerUse,
+                selectedCraftableItem.weaponType,
+                selectedCraftableItem.imageUrl,
+                selectedCraftableItem.price,
+                false
+            );
+
+            itemIds[i] = tokenId;
+            _safeMint(msg.sender, tokenId);
+            _setTokenURI(tokenId, selectedCraftableItem.imageUrl);
+            emit ItemCreated(tokenId, msg.sender);
+        }
+        return itemIds;
+    }
+
+    function updateImage(uint256 tokenId, string memory imageUrl)
+        external
+        onlyOwner
+    {
+        _setTokenURI(tokenId, imageUrl);
+        items[tokenId].imageUrl = imageUrl;
     }
 
     function transferItem(address to, uint256 tokenId)
@@ -542,7 +369,9 @@ contract WorldOfBlast is ERC721URIStorage, Ownable {
                 '{"name": "',
                 items[tokenId].name,
                 '", ',
-                '"description":items[tokenId].description, ',
+                '"description": "',
+                items[tokenId].description,
+                '", ',
                 '"image": "',
                 items[tokenId].imageUrl,
                 '", ',
@@ -570,12 +399,33 @@ contract WorldOfBlast is ERC721URIStorage, Ownable {
         return string(abi.encodePacked(baseURI, json));
     }
 
-    function addCreator(address _creator) external onlyOwner {
-        creators[_creator] = true;
+    function authorizeContract(
+        address contractAddress,
+        uint256 tokenId,
+        bool authorized
+    ) external {
+        require(
+            ownerOf(tokenId) == msg.sender,
+            "Only the owner can authorize a contract"
+        );
+        require(!items[tokenId].isStaked, "Item staked");
+        authorizedContractsByItem[contractAddress][tokenId] = authorized;
+        emit AuthorizedContract(contractAddress, tokenId, authorized);
     }
 
-    function removeCreator(address _creator) external onlyOwner {
-        creators[_creator] = false;
+    function updateDurability(uint256 tokenId, uint256 newDurability)
+        external
+        onlyAuthorizedContract(tokenId)
+    {
+        items[tokenId].durability = newDurability;
+        emit ItemUpdated(tokenId, newDurability);
+    }
+
+    function setStakedStatus(uint256 tokenId, bool status)
+        external
+        onlyAuthorizedContract(tokenId)
+    {
+        items[tokenId].isStaked = status;
     }
 
     function uint2str(uint256 _i)
