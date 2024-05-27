@@ -1,121 +1,113 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
-
+import "@openzeppelin/contracts/utils/math/SafeMath.sol";
 import "@openzeppelin/contracts/token/ERC721/IERC721.sol";
-import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 
-contract GameWob is ReentrancyGuard {
-    IERC721 public nftContract;
-
+interface IMonsterContract {
     struct Monster {
         uint256 id;
         string name;
-        string img;
         uint256 weight;
     }
 
-    struct Location {
+    function drawMonster() external view returns (Monster memory);
+}
+
+interface IExtendedERC721 is IERC721 {
+    function authorizeContract(
+        address contractAddress,
+        uint256 tokenId,
+        bool authorized
+    ) external;
+}
+
+contract WorldOfBlastGame {
+    using SafeMath for uint256;
+
+    address[] public locations;
+    IExtendedERC721 public nftContract;
+
+    struct Hunt {
         uint256 id;
-        string name;
-        string img;
-        uint256[] monsters;
+        address hunter;
+        address location;
+        uint256 weapon;
+        uint256 startTime;
+        uint256 endTime;
+        IMonsterContract.Monster monster;
     }
 
-    mapping(uint256 => Location) public locations;
-    mapping(uint256 => Monster) public monsters;
+    uint256 public huntCount;
 
-    uint256 private locationIdCounter = 1;
-    uint256 private monsterIdCounter = 1;
+    mapping(address => uint256) public huntStartTimes;
 
-    mapping(address => bool) public creators;
+    mapping(uint256 => Hunt) public hunts;
 
-    modifier onlyCreators() {
-        require(creators[msg.sender], "Only owner or creator");
-        _;
+    event HuntHasBegun(address hunter, address location, uint256 weapon);
+
+    constructor() {}
+
+    function addLocation(address _monsterContractAddress) public {
+        locations.push(_monsterContractAddress);
     }
 
-    constructor(address _nftContractAddress) {
-        nftContract = IERC721(_nftContractAddress);
+    function removeLocation(uint256 index) public {
+        require(index < locations.length, "Invalid index");
+        locations[index] = locations[locations.length - 1];
+        locations.pop();
     }
 
-    function addLocation(string memory _locationName, string memory _img)
-        external
-        onlyCreators
+    function setNFTContract(address _nftContractAddress) public {
+        nftContract = IExtendedERC721(_nftContractAddress);
+    }
+
+    function startHunt(uint256 locationId, uint256 nftId)
+        public
+        returns (uint256)
     {
-        locationIdCounter++;
-        locations[locationIdCounter] = Location(
-            locationIdCounter,
-            _locationName,
-            _img,
-            new uint256[](0)
-        );
-    }
-
-    function addMonster(
-        string memory _monsterName,
-        uint256 _weight,
-        string memory _img
-    ) external onlyCreators {
-        monsterIdCounter++;
-        monsters[monsterIdCounter] = Monster(
-            monsterIdCounter,
-            _monsterName,
-            _img,
-            _weight
-        );
-    }
-
-    function addMonsterToLocation(uint256 _locationId, uint256 _monsterId)
-        external
-        onlyCreators
-    {
-        require(locations[_locationId].id != 0, "Location does not exist");
-        require(monsters[_monsterId].id != 0, "Monster does not exist");
-        locations[_locationId].monsters.push(_monsterId);
-    }
-
-    function getLocation(uint256 _locationId)
-        external
-        view
-        returns (
-            uint256 id,
-            string memory name,
-            string memory img
-        )
-    {
-        Location storage location = locations[_locationId];
-        return (location.id, location.name, location.img);
-    }
-
-    function getMonster(uint256 _monsterId)
-        external
-        view
-        returns (
-            uint256 id,
-            string memory name,
-            string memory img,
-            uint256 weight
-        )
-    {
-        Monster storage monster = monsters[_monsterId];
-        return (monster.id, monster.name, monster.img, monster.weight);
-    }
-
-    function getMonstersInLocation(uint256 _locationId)
-        external
-        view
-        returns (uint256[] memory)
-    {
-        return locations[_locationId].monsters;
-    }
-
-    
-
-    function hunt(uint256 _locationId) external nonReentrant {
-        require(locations[_locationId].id != 0, "Location does not exist");
+        require(locationId < locations.length, "Invalid location ID");
         require(
-            locations[_locationId].monsters.length > 0,
-            "No monsters in this location"
+            nftContract.ownerOf(nftId) == msg.sender,
+            "Not the owner of the NFT"
         );
+
+        require(huntStartTimes[msg.sender] == 0, "Hunt already started");
+
+        address _location = locations[locationId];
+
+        IMonsterContract monsterContract = IMonsterContract(_location);
+
+        IMonsterContract.Monster memory monster = monsterContract.drawMonster();
+
+        Hunt memory newHunt = Hunt({
+            id: huntCount,
+            hunter: msg.sender,
+            location: _location,
+            weapon: nftId,
+            startTime: block.timestamp,
+            endTime: 0,
+            monster: monster
+        });
+
+        hunts[huntCount] = newHunt;
+
+        huntStartTimes[msg.sender] = block.timestamp;
+
+        huntCount++;
+
+        emit HuntHasBegun(msg.sender, _location, nftId);
+
+        return huntCount - 1;
+    }
+
+    function endHunt(uint256 huntId) public {
+        require(huntId < huntCount, "Invalid hunt ID");
+        require(
+            hunts[huntId].hunter == msg.sender,
+            "Not the hunter of this hunt"
+        );
+        require(hunts[huntId].endTime == 0, "Hunt already ended");
+        hunts[huntId].endTime = block.timestamp;
+        huntStartTimes[msg.sender] = 0;
     }
 }
