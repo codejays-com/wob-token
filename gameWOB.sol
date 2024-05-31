@@ -109,5 +109,31 @@ contract WorldOfBlastGame {
         require(hunts[huntId].endTime == 0, "Hunt already ended");
         hunts[huntId].endTime = block.timestamp;
         huntStartTimes[msg.sender] = 0;
+
+        uint128 totalHitsQuantity = 100; // calculation of start time and end time
+        uint128 monsterAttack = 10;
+        uint128 baseCharacterDesense = 5;
+        uint128 durability = 200; // durability of nft
+
+        for (uint128 index = 0; index < totalHitsQuantity; index++) {
+            uint128 atackCalculation = monsterAttack - baseCharacterDesense;
+            uint256 randomHash = uint256(
+                keccak256(
+                    abi.encodePacked(
+                        block.timestamp, // Current block timestamp
+                        index,
+                        msg.sender
+                    )
+                )
+            );
+
+            uint128 damage = uint128(randomHash % atackCalculation);
+
+            if (durability - damage < 0) {
+                break;
+            } else {
+                durability -= damage;
+            }    
+        }
     }
 }
