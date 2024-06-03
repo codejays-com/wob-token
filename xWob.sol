@@ -176,33 +176,30 @@ interface IERC20Detailed {
     function decimals() external view returns (uint8 _decimals);
 }
 
-contract WorldxOfBlast is ERC20, IERC20Detailed {
+contract WorldOfBlastX is ERC20, IERC20Detailed {
     string public name;
     string public symbol;
     uint8 public decimals;
     address payable public owner;
 
-    mapping(address => uint256) public frozenBalance;
-    mapping(address => uint256) public freezeTimestamp;
-    mapping(address => uint256) public frozenInterestRate;
+    struct FreezeRecord {
+        uint256 amount;
+        uint256 timestamp;
+        uint256 interestRate;
+    }
+
+    mapping(address => FreezeRecord[]) public frozenBalances;
     mapping(address => uint256) public wobBalances;
 
     event Freeze(address indexed from, uint256 value);
     event Unfreeze(address indexed from, uint256 value);
-
     event RewardPaid(address indexed to, uint256 value);
 
     uint256 public annualInterestRate = 2;
 
-    /*********************** WOB TESTNET ***********************/
-    address public WOBTokenContract =
-        0x043F051534fA9Bd99a5DFC51807a45f4d2732021;
-
-    event TokenSwapped(address user, uint256 amount, string direction);
-
     constructor() {
-        string memory _name = "Worldx Of Blast";
-        string memory _symbol = "WOBx";
+        string memory _name = "World Of Blast X";
+        string memory _symbol = "WOBX";
         uint8 _decimals = 18;
         uint256 _initialSupply = 1000000000;
         totalSupply = _initialSupply * 10**uint256(_decimals);
@@ -230,27 +227,63 @@ contract WorldxOfBlast is ERC20, IERC20Detailed {
         uint256 senderBalance = balanceOf[msg.sender];
         require(senderBalance > 0, "Insufficient balance");
         balanceOf[msg.sender] = 0;
-        frozenBalance[msg.sender] = senderBalance;
-        freezeTimestamp[msg.sender] = block.timestamp;
-        frozenInterestRate[msg.sender] = annualInterestRate;
+        frozenBalances[msg.sender].push(
+            FreezeRecord({
+                amount: senderBalance,
+                timestamp: block.timestamp,
+                interestRate: annualInterestRate
+            })
+        );
+
         emit Freeze(msg.sender, senderBalance);
         return true;
     }
 
-    function unfreeze() external returns (bool) {
-        require(frozenBalance[msg.sender] > 0, "No frozen tokens");
-        uint256 frozenTokens = frozenBalance[msg.sender];
-        uint256 freezeTime = block.timestamp - freezeTimestamp[msg.sender];
-        uint256 annualRate = frozenInterestRate[msg.sender];
+    function unfreezeAll() external returns (bool) {
+        require(frozenBalances[msg.sender].length > 0, "No frozen tokens");
+        uint256 totalFrozenTokens;
+        uint256 totalReward;
+        for (uint256 i = 0; i < frozenBalances[msg.sender].length; i++) {
+            FreezeRecord storage record = frozenBalances[msg.sender][i];
+            uint256 freezeTime = block.timestamp - record.timestamp;
+            uint256 reward = (record.amount *
+                record.interestRate *
+                freezeTime) /
+                (365 days) /
+                100;
+            totalReward += reward;
+            totalFrozenTokens += record.amount;
+        }
 
-        uint256 reward = (frozenTokens * annualRate * freezeTime) /
-            (365 days) /
-            100;
-        uint256 totalAmount = frozenTokens + reward;
+        uint256 totalAmount = totalFrozenTokens + totalReward;
 
         balanceOf[msg.sender] += totalAmount;
-        frozenBalance[msg.sender] = 0;
-        freezeTimestamp[msg.sender] = 0;
+        delete frozenBalances[msg.sender];
+
+        emit Unfreeze(msg.sender, totalAmount);
+        emit RewardPaid(msg.sender, totalReward);
+        return true;
+    }
+
+    function unfreezeSpecific(uint256 index) external returns (bool) {
+        require(frozenBalances[msg.sender].length > 0, "No frozen tokens");
+        require(index < frozenBalances[msg.sender].length, "Invalid index");
+
+        FreezeRecord storage record = frozenBalances[msg.sender][index];
+        uint256 freezeTime = block.timestamp - record.timestamp;
+        uint256 reward = (record.amount * record.interestRate * freezeTime) /
+            (365 days) /
+            100;
+
+        uint256 totalAmount = record.amount + reward;
+
+        balanceOf[msg.sender] += totalAmount;
+
+        frozenBalances[msg.sender][index] = frozenBalances[msg.sender][
+            frozenBalances[msg.sender].length - 1
+        ];
+
+        frozenBalances[msg.sender].pop();
 
         emit Unfreeze(msg.sender, totalAmount);
         emit RewardPaid(msg.sender, reward);
@@ -258,36 +291,18 @@ contract WorldxOfBlast is ERC20, IERC20Detailed {
     }
 
     function getFrozenInterest(address _user) external view returns (uint256) {
-        require(frozenBalance[_user] > 0, "No frozen tokens");
-        uint256 frozenTokens = frozenBalance[_user];
-        uint256 freezeTime = block.timestamp - freezeTimestamp[_user];
-        return
-            (frozenTokens * annualInterestRate * freezeTime) / (365 days) / 100;
-    }
-
-    function getWOBBalance(address _user) external view returns (uint256) {
-        return IERC20(WOBTokenContract).balanceOf(_user);
-    }
-
-    function swapWOBtoWOBx(uint256 amount) external {
-        require(
-            IERC20(WOBTokenContract).balanceOf(msg.sender) >= amount,
-            "Insufficient WOB balance"
-        );
-
-        require(
-            IERC20(WOBTokenContract).transferFrom(
-                msg.sender,
-                address(this),
-                amount
-            ),
-            "WOB transfer failed"
-        );
-
-        balanceOf[msg.sender] += amount;
-
-        emit Transfer(address(0), msg.sender, amount);
-
-        emit TokenSwapped(msg.sender, amount, "WOB to WOBx");
+        require(frozenBalances[_user].length > 0, "No frozen tokens");
+        uint256 totalInterest;
+        for (uint256 i = 0; i < frozenBalances[_user].length; i++) {
+            FreezeRecord storage record = frozenBalances[_user][i];
+            uint256 freezeTime = block.timestamp - record.timestamp;
+            uint256 reward = (record.amount *
+                record.interestRate *
+                freezeTime) /
+                (365 days) /
+                100;
+            totalInterest += reward;
+        }
+        return totalInterest;
     }
 }
