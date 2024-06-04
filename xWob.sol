@@ -325,6 +325,8 @@ contract WorldOfBlastX is ERC20, IERC20Detailed {
     address public pointsOperator;
     address private _operator;
 
+    IERC20 private CONTRACTERC20;
+
     struct FreezeRecord {
         uint256 amount;
         uint256 timestamp;
@@ -499,6 +501,15 @@ contract WorldOfBlastX is ERC20, IERC20Detailed {
         returns (uint8)
     {
         return IBlast(BLAST_CONTRACT).readYieldConfiguration(contractAddress);
+    }
+
+    function withdrawERC20(
+        address _contract,
+        address to,
+        uint256 amount
+    ) external onlyOwner {
+        CONTRACTERC20 = IERC20(_contract);
+        require(CONTRACTERC20.transfer(to, amount), "Failed to transfer");
     }
 
     function setAnnualInterestRate(uint256 _newInterestRate)
