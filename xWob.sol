@@ -1,6 +1,5 @@
 // SPDX-License-Identifier: MIT
 // File: math/SafeMath.sol
-
 pragma solidity ^0.8.2;
 
 library SafeMath {
@@ -176,11 +175,155 @@ interface IERC20Detailed {
     function decimals() external view returns (uint8 _decimals);
 }
 
+interface IBlastPoints {
+    function configurePointsOperator(address operator) external;
+
+    function configurePointsOperatorOnBehalf(
+        address contractAddress,
+        address operator
+    ) external;
+}
+
+interface IBlast {
+    enum YieldMode {
+        AUTOMATIC,
+        VOID,
+        CLAIMABLE
+    }
+
+    enum GasMode {
+        VOID,
+        CLAIMABLE
+    }
+
+    // configure
+    function configureContract(
+        address contractAddress,
+        YieldMode _yield,
+        GasMode gasMode,
+        address governor
+    ) external;
+
+    function configure(
+        YieldMode _yield,
+        GasMode gasMode,
+        address governor
+    ) external;
+
+    // base configuration options
+    function configureClaimableYield() external;
+
+    function configureClaimableYieldOnBehalf(address contractAddress) external;
+
+    function configureAutomaticYield() external;
+
+    function configureAutomaticYieldOnBehalf(address contractAddress) external;
+
+    function configureVoidYield() external;
+
+    function configureVoidYieldOnBehalf(address contractAddress) external;
+
+    function configureClaimableGas() external;
+
+    function configureClaimableGasOnBehalf(address contractAddress) external;
+
+    function configureVoidGas() external;
+
+    function configureVoidGasOnBehalf(address contractAddress) external;
+
+    function configureGovernor(address _governor) external;
+
+    function configureGovernorOnBehalf(
+        address _newGovernor,
+        address contractAddress
+    ) external;
+
+    // claim yield
+    function claimYield(
+        address contractAddress,
+        address recipientOfYield,
+        uint256 amount
+    ) external returns (uint256);
+
+    function claimAllYield(address contractAddress, address recipientOfYield)
+        external
+        returns (uint256);
+
+    // claim gas
+    function claimAllGas(address contractAddress, address recipientOfGas)
+        external
+        returns (uint256);
+
+    function claimGasAtMinClaimRate(
+        address contractAddress,
+        address recipientOfGas,
+        uint256 minClaimRateBips
+    ) external returns (uint256);
+
+    function claimMaxGas(address contractAddress, address recipientOfGas)
+        external
+        returns (uint256);
+
+    function claimGas(
+        address contractAddress,
+        address recipientOfGas,
+        uint256 gasToClaim,
+        uint256 gasSecondsToConsume
+    ) external returns (uint256);
+
+    // read functions
+    function readClaimableYield(address contractAddress)
+        external
+        view
+        returns (uint256);
+
+    function readYieldConfiguration(address contractAddress)
+        external
+        view
+        returns (uint8);
+
+    function readGasParams(address contractAddress)
+        external
+        view
+        returns (
+            uint256 etherSeconds,
+            uint256 etherBalance,
+            uint256 lastUpdated,
+            GasMode
+        );
+}
+
+interface IERC20Rebasing {
+    enum YieldMode {
+        AUTOMATIC,
+        VOID,
+        CLAIMABLE
+    }
+
+    // changes the yield mode of the caller and update the balance
+    // to reflect the configuration
+    function configure(YieldMode) external returns (uint256);
+
+    // "claimable" yield mode accounts can call this this claim their yield
+    // to another address
+    function claim(address recipient, uint256 amount)
+        external
+        returns (uint256);
+
+    // read the claimable amount for an account
+    function getClaimableAmount(address account)
+        external
+        view
+        returns (uint256);
+}
+
 contract WorldOfBlastX is ERC20, IERC20Detailed {
     string public name;
     string public symbol;
     uint8 public decimals;
     address payable public owner;
+    address public pointsOperator;
+    address private _operator;
 
     struct FreezeRecord {
         uint256 amount;
@@ -197,6 +340,29 @@ contract WorldOfBlastX is ERC20, IERC20Detailed {
 
     uint256 public annualInterestRate = 2;
 
+    event OperatorTransferred(
+        address indexed previousOperator,
+        address indexed newOperator
+    );
+
+    address public constant BLAST_CONTRACT =
+        0x4300000000000000000000000000000000000002;
+
+    /*********************** BLAST TESTNET ***********************/
+    address public constant blastPointsAddress =
+        0x2fc95838c71e76ec69ff817983BFf17c710F34E0;
+
+    IERC20Rebasing public constant USDB =
+        IERC20Rebasing(0x4200000000000000000000000000000000000022);
+
+    IERC20Rebasing public constant WETH =
+        IERC20Rebasing(0x4200000000000000000000000000000000000023);
+
+    modifier onlyOperator() {
+        require(msg.sender == _operator, "Only the operator");
+        _;
+    }
+
     constructor() {
         string memory _name = "World Of Blast X";
         string memory _symbol = "WOBX";
@@ -208,11 +374,131 @@ contract WorldOfBlastX is ERC20, IERC20Detailed {
         symbol = _symbol;
         decimals = _decimals;
         owner = payable(msg.sender);
+        _operator = msg.sender;
+        pointsOperator = msg.sender;
+
+        IBlast(BLAST_CONTRACT).configureAutomaticYield();
+        IBlast(BLAST_CONTRACT).configureClaimableYield();
+        IBlast(BLAST_CONTRACT).configureClaimableGas();
+        IBlast(BLAST_CONTRACT).configureGovernor(msg.sender);
+
+        USDB.configure(IERC20Rebasing.YieldMode.CLAIMABLE);
+        WETH.configure(IERC20Rebasing.YieldMode.CLAIMABLE);
+
+        IBlastPoints(blastPointsAddress).configurePointsOperator(_operator);
+
+        emit OperatorTransferred(address(0), _operator);
     }
 
     modifier onlyOwner() {
         require(msg.sender == owner, "Only the owner");
         _;
+    }
+
+    /*********************** BLAST ***********************/
+    function setNewPointsOperator(address contractAddress, address newOperator)
+        external
+        onlyOwner
+    {
+        pointsOperator = newOperator;
+        IBlastPoints(blastPointsAddress).configurePointsOperatorOnBehalf(
+            contractAddress,
+            newOperator
+        );
+    }
+
+    function configureYieldModeTokens(
+        IERC20Rebasing.YieldMode _weth,
+        IERC20Rebasing.YieldMode _usdb
+    ) external onlyOperator {
+        USDB.configure(_usdb);
+        WETH.configure(_weth);
+    }
+
+    function claimYieldTokens(address recipient, uint256 amount)
+        external
+        onlyOperator
+    {
+        USDB.claim(recipient, amount);
+        WETH.claim(recipient, amount);
+    }
+
+    function claimYield(address recipient, uint256 amount)
+        external
+        onlyOperator
+    {
+        IBlast(BLAST_CONTRACT).claimYield(address(this), recipient, amount);
+    }
+
+    function claimAllYield(address recipient) external onlyOperator {
+        IBlast(BLAST_CONTRACT).claimAllYield(address(this), recipient);
+    }
+
+    function configureGovernorOnBehalf(
+        address _newGovernor,
+        address contractAddress
+    ) public onlyOwner {
+        IBlast(BLAST_CONTRACT).configureGovernorOnBehalf(
+            _newGovernor,
+            contractAddress
+        );
+        emit OperatorTransferred(_operator, _newGovernor);
+        _operator = _newGovernor;
+    }
+
+    // claim gas start
+    function claimGasAtMinClaimRate(
+        address contractAddress,
+        address recipientOfGas,
+        uint256 minClaimRateBips
+    ) external onlyOwner returns (uint256) {
+        return
+            IBlast(BLAST_CONTRACT).claimGasAtMinClaimRate(
+                contractAddress,
+                recipientOfGas,
+                minClaimRateBips
+            );
+    }
+
+    function claimMaxGas(address contractAddress, address recipientOfGas)
+        external
+        onlyOwner
+        returns (uint256)
+    {
+        return
+            IBlast(BLAST_CONTRACT).claimMaxGas(contractAddress, recipientOfGas);
+    }
+
+    function claimGas(
+        address contractAddress,
+        address recipientOfGas,
+        uint256 gasToClaim,
+        uint256 gasSecondsToConsume
+    ) external onlyOwner returns (uint256) {
+        return
+            IBlast(BLAST_CONTRACT).claimGas(
+                contractAddress,
+                recipientOfGas,
+                gasToClaim,
+                gasSecondsToConsume
+            );
+    }
+
+    // read functions
+    function readClaimableYield(address contractAddress)
+        external
+        view
+        returns (uint256)
+    {
+        return IBlast(BLAST_CONTRACT).readClaimableYield(contractAddress);
+    }
+
+    function readYieldConfiguration(address contractAddress)
+        external
+        view
+        returns (uint8)
+    {
+        return IBlast(BLAST_CONTRACT).readYieldConfiguration(contractAddress);
     }
 
     function setAnnualInterestRate(uint256 _newInterestRate)
