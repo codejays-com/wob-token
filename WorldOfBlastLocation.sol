@@ -4,6 +4,7 @@ import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
 import "@openzeppelin/contracts/token/ERC721/extensions/ERC721URIStorage.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/utils/math/SafeMath.sol";
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 contract WorldOfBlastLocation is ERC721URIStorage, Ownable {
     using SafeMath for uint256;
@@ -18,6 +19,7 @@ contract WorldOfBlastLocation is ERC721URIStorage, Ownable {
     }
 
     string private _contractURI;
+    IERC20 private CONTRACT_ERC20;
 
     mapping(uint256 => Monster) public monsters;
     uint256 private monsterIdCounter = 1;
@@ -139,6 +141,11 @@ contract WorldOfBlastLocation is ERC721URIStorage, Ownable {
         monsters[tokenId].name = name;
     }
 
+    function getMonster(uint256 tokenId) public view returns (Monster memory) {
+        Monster memory monster = monsters[tokenId];
+        return monster;
+    }
+
     function tokenURI(uint256 tokenId)
         public
         view
@@ -171,6 +178,15 @@ contract WorldOfBlastLocation is ERC721URIStorage, Ownable {
             )
         );
         return string(abi.encodePacked(baseURI, json));
+    }
+
+    function withdrawERC20(
+        address _contract,
+        address to,
+        uint256 amount
+    ) external onlyOwner {
+        CONTRACT_ERC20 = IERC20(_contract);
+        require(CONTRACT_ERC20.transfer(to, amount), "Failed to transfer");
     }
 
     function uint2str(uint256 _i)
