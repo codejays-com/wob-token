@@ -7,6 +7,7 @@ contract WorldOfBlastCrafting is Ownable {
     using SafeMath for uint256;
 
     struct Item {
+        uint256 id;
         string name;
         string description;
         uint256 damage;
@@ -15,18 +16,18 @@ contract WorldOfBlastCrafting is Ownable {
         uint256 durabilityPerUse;
         string weaponType;
         string imageUrl;
-        uint256 price;
         uint256 weightProbability;
     }
 
     struct Crafting {
-        Item[] craftableItems;
+        uint256[] itemIds;
         uint256 totalCraftableItems;
     }
 
     Crafting private craftingContract;
+    uint256 private nextItemId;
 
-    mapping(uint256 => Item) public items;
+    mapping(uint256 => Item) private items;
     mapping(address => bool) public creators;
 
     event ItemCreated(uint256 indexed itemId, address indexed owner);
@@ -56,7 +57,7 @@ contract WorldOfBlastCrafting is Ownable {
     }
 
     function getCraftableItem(uint256 id)
-        external
+        public
         view
         returns (
             string memory name,
@@ -67,15 +68,11 @@ contract WorldOfBlastCrafting is Ownable {
             uint256 durabilityPerUse,
             string memory weaponType,
             string memory imageUrl,
-            uint256 price,
             uint256 weightProbability
         )
     {
-        require(
-            id < craftingContract.totalCraftableItems,
-            "Item ID out of range"
-        );
-        Item storage craftableItem = craftingContract.craftableItems[id];
+        require(items[id].id != 0, "Item ID does not exist");
+        Item storage craftableItem = items[id];
         return (
             craftableItem.name,
             craftableItem.description,
@@ -85,9 +82,12 @@ contract WorldOfBlastCrafting is Ownable {
             craftableItem.durabilityPerUse,
             craftableItem.weaponType,
             craftableItem.imageUrl,
-            craftableItem.price,
             craftableItem.weightProbability
         );
+    }
+
+    function getTotalCraftableItems() public view returns (uint256) {
+        return craftingContract.totalCraftableItems;
     }
 
     function createCraftableItem(
@@ -99,13 +99,11 @@ contract WorldOfBlastCrafting is Ownable {
         uint256 durabilityPerUse,
         string memory weaponType,
         string memory imageUrl,
-        uint256 price,
         uint256 weightProbability
     ) external payable onlyCreator {
-        // Example of adding a fee for item creation (adjust fee amount as needed)
-        require(msg.value >= 0.1 ether, "Insufficient fee");
-
+        nextItemId++;
         Item memory newItem = Item({
+            id: nextItemId,
             name: name,
             description: description,
             damage: damage,
@@ -114,12 +112,12 @@ contract WorldOfBlastCrafting is Ownable {
             durabilityPerUse: durabilityPerUse,
             weaponType: weaponType,
             imageUrl: imageUrl,
-            price: price,
             weightProbability: weightProbability
         });
-        craftingContract.craftableItems.push(newItem);
+        items[nextItemId] = newItem;
+        craftingContract.itemIds.push(nextItemId);
         craftingContract.totalCraftableItems++;
-        emit ItemCreated(craftingContract.totalCraftableItems - 1, msg.sender);
+        emit ItemCreated(nextItemId, msg.sender);
     }
 
     function editCraftableItem(
@@ -132,14 +130,10 @@ contract WorldOfBlastCrafting is Ownable {
         uint256 durabilityPerUse,
         string memory weaponType,
         string memory imageUrl,
-        uint256 price,
         uint256 weightProbability
     ) external onlyCreator {
-        require(
-            itemId < craftingContract.totalCraftableItems,
-            "Item ID out of range"
-        );
-        Item storage craftableItem = craftingContract.craftableItems[itemId];
+        require(items[itemId].id != 0, "Item ID does not exist");
+        Item storage craftableItem = items[itemId];
         craftableItem.name = name;
         craftableItem.description = description;
         craftableItem.damage = damage;
@@ -148,46 +142,58 @@ contract WorldOfBlastCrafting is Ownable {
         craftableItem.durabilityPerUse = durabilityPerUse;
         craftableItem.weaponType = weaponType;
         craftableItem.imageUrl = imageUrl;
-        craftableItem.price = price;
         craftableItem.weightProbability = weightProbability;
         emit ItemUpdated(itemId, durability);
     }
 
     function deleteCraftableItem(uint256 itemId) external onlyOwner {
-        require(
-            itemId < craftingContract.totalCraftableItems,
-            "Item ID out of range"
-        );
-        uint256 lastIndex = craftingContract.craftableItems.length - 1;
+        require(items[itemId].id != 0, "Item ID does not exist");
 
-        if (itemId != lastIndex) {
-            craftingContract.craftableItems[itemId] = craftingContract
-                .craftableItems[lastIndex];
+        delete items[itemId];
+        for (uint256 i = 0; i < craftingContract.itemIds.length; i++) {
+            if (craftingContract.itemIds[i] == itemId) {
+                craftingContract.itemIds[i] = craftingContract.itemIds[
+                    craftingContract.itemIds.length - 1
+                ];
+                craftingContract.itemIds.pop();
+                break;
+            }
         }
 
-        craftingContract.craftableItems.pop();
         craftingContract.totalCraftableItems--;
-
         emit ItemDeleted(itemId);
     }
 
-    function drawCraftableItem() public view returns (Item memory) {
+    function drawCraftableItem()
+        public
+        view
+        returns (
+            string memory name,
+            string memory description,
+            uint256 damage,
+            uint256 attackSpeed,
+            uint256 durability,
+            uint256 durabilityPerUse,
+            string memory weaponType,
+            string memory imageUrl,
+            uint256 weightProbability
+        )
+    {
         require(craftingContract.totalCraftableItems > 0, "No items available");
 
         uint256 totalWeight = 0;
-        for (uint256 i = 0; i < craftingContract.totalCraftableItems; i++) {
-            totalWeight += craftingContract.craftableItems[i].weightProbability;
+        for (uint256 i = 0; i < craftingContract.itemIds.length; i++) {
+            totalWeight += items[craftingContract.itemIds[i]].weightProbability;
         }
 
         uint256 randomWeight = random(block.timestamp, totalWeight);
 
         uint256 cumulativeWeight = 0;
-        for (uint256 i = 0; i < craftingContract.totalCraftableItems; i++) {
-            cumulativeWeight += craftingContract
-                .craftableItems[i]
+        for (uint256 i = 0; i < craftingContract.itemIds.length; i++) {
+            cumulativeWeight += items[craftingContract.itemIds[i]]
                 .weightProbability;
             if (randomWeight < cumulativeWeight) {
-                return craftingContract.craftableItems[i];
+                return getCraftableItem(craftingContract.itemIds[i]);
             }
         }
 
