@@ -63,10 +63,17 @@ contract WorldOfBlastNft is ERC721URIStorage, Ownable {
 
     mapping(uint256 => Item) private items;
     mapping(address => bool) public creators;
+    mapping(address => mapping(uint256 => bool))
+        public authorizedContractsByItem;
 
     event ItemCreated(uint256 indexed tokenId, address indexed owner);
     event ItemUpdated(uint256 indexed tokenId, uint256 durability);
     event InBattleSet(uint256 indexed tokenId, bool value);
+    event AuthorizedContract(
+        address indexed contractAddress,
+        uint256 indexed tokenId,
+        bool authorized
+    );
 
     modifier onlyTokenOwner(uint256 tokenId) {
         require(
@@ -78,6 +85,19 @@ contract WorldOfBlastNft is ERC721URIStorage, Ownable {
 
     modifier onlyCreator() {
         require(creators[msg.sender], "Only owner or creator");
+        _;
+    }
+
+    modifier notStaked(uint256 tokenId) {
+        require(!items[tokenId].isStaked, "Item is currently staked");
+        _;
+    }
+
+    modifier onlyAuthorizedContract(uint256 tokenId) {
+        require(
+            authorizedContractsByItem[msg.sender][tokenId],
+            "Not authorized to edit this item"
+        );
         _;
     }
 
@@ -101,7 +121,6 @@ contract WorldOfBlastNft is ERC721URIStorage, Ownable {
     }
 
     function updateWOBAddress(address _newWobAddress) external onlyOwner {
-        require(_newWobAddress != address(0), "Invalid address");
         WOB = IERC20(_newWobAddress);
     }
 
@@ -208,33 +227,47 @@ contract WorldOfBlastNft is ERC721URIStorage, Ownable {
         return itemIds;
     }
 
-    function updateItemDurability(uint256 tokenId, uint256 durability)
+    function updateImage(uint256 tokenId, string memory imageUrl)
         external
         onlyCreator
     {
-        Item storage item = items[tokenId];
-        require(item.isStaked, "Item is not in staked");
-        item.durability = durability;
-        emit ItemUpdated(tokenId, durability);
+        _setTokenURI(tokenId, imageUrl);
+        items[tokenId].imageUrl = imageUrl;
     }
 
-    function setIsStakedTrue(uint256 tokenId) external onlyTokenOwner(tokenId) {
-        Item storage item = items[tokenId];
-        require(!item.isStaked, "Item is already in staked");
-        item.isStaked = true;
-        emit InBattleSet(tokenId, true);
+    function authorizeContract(
+        address contractAddress,
+        uint256 tokenId,
+        bool authorized
+    ) external notStaked(tokenId) {
+        require(
+            ownerOf(tokenId) == msg.sender,
+            "Only the owner can authorize a contract"
+        );
+
+        authorizedContractsByItem[contractAddress][tokenId] = authorized;
+        emit AuthorizedContract(contractAddress, tokenId, authorized);
     }
 
-    function setIsStakedFalse(uint256 tokenId) external onlyCreator {
-        Item storage item = items[tokenId];
-        require(item.isStaked, "Item is not in staked");
-        item.isStaked = false;
-        emit InBattleSet(tokenId, false);
+    function updateDurability(uint256 tokenId, uint256 newDurability)
+        external
+        onlyAuthorizedContract(tokenId)
+    {
+        items[tokenId].durability = newDurability;
+        emit ItemUpdated(tokenId, newDurability);
+    }
+
+    function setStakedStatus(uint256 tokenId, bool status)
+        external
+        onlyAuthorizedContract(tokenId)
+    {
+        items[tokenId].isStaked = status;
     }
 
     function transferItem(address to, uint256 tokenId)
         external
         onlyTokenOwner(tokenId)
+        notStaked(tokenId)
     {
         _transfer(msg.sender, to, tokenId);
     }
