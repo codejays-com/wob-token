@@ -1,4 +1,4 @@
-//SPDX-License-Identifier: MIT
+// SPDX-License-Identifier: MIT
 pragma solidity ^0.8.2;
 
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
@@ -27,6 +27,14 @@ contract WorldOfBlastSwap is Ownable {
         address indexed toToken,
         uint256 amount
     );
+    event WobTokenUpdated(
+        address indexed oldAddress,
+        address indexed newAddress
+    );
+    event WobxTokenUpdated(
+        address indexed oldAddress,
+        address indexed newAddress
+    );
 
     constructor(IERC20 _wob, IERC20 _wobx) Ownable(msg.sender) {
         wob = _wob;
@@ -41,14 +49,14 @@ contract WorldOfBlastSwap is Ownable {
         wobx.approve(address(this), _amount);
     }
 
-    function withdrawWobx(uint256 _amount) external onlyOwner {
-        wobx.safeTransfer(owner(), _amount);
-        emit Withdrawn(owner(), address(wobx), _amount);
+    function withdrawWobx(address _to, uint256 _amount) external onlyOwner {
+        wobx.safeTransfer(_to, _amount);
+        emit Withdrawn(_to, address(wobx), _amount);
     }
 
-    function withdrawWob(uint256 _amount) external onlyOwner {
-        wob.safeTransfer(owner(), _amount);
-        emit Withdrawn(owner(), address(wob), _amount);
+    function withdrawWob(address _to, uint256 _amount) external onlyOwner {
+        wob.safeTransfer(_to, _amount);
+        emit Withdrawn(_to, address(wob), _amount);
     }
 
     function swapWobForWobx(uint256 _amount) external {
@@ -73,5 +81,23 @@ contract WorldOfBlastSwap is Ownable {
         wob.safeTransfer(msg.sender, _amount);
 
         emit Swapped(msg.sender, address(wobx), address(wob), _amount);
+    }
+
+    function setWob(address _newWob) external onlyOwner {
+        emit WobTokenUpdated(address(wob), _newWob);
+        wob = IERC20(_newWob);
+    }
+
+    function setWobx(address _newWobx) external onlyOwner {
+        emit WobxTokenUpdated(address(wobx), _newWobx);
+        wobx = IERC20(_newWobx);
+    }
+
+    function withdrawERC20(
+        address _contract,
+        address to,
+        uint256 amount
+    ) external onlyOwner {
+        require(IERC20(_contract).transfer(to, amount), "Failed to transfer");
     }
 }
