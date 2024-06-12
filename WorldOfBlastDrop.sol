@@ -28,11 +28,11 @@ contract WorldOfBlastDrop is Ownable {
         if (amount > currentAmount) {
             amount = currentAmount;
         }
-        currentToken.transferFrom(address(this), to, amount);
+        currentToken.transfer(to, amount);
     }
 
     function transferFromERC721(uint256 tokenId, address to) external onlyOwner {
         IERC721 currentToken = IERC721(contractNFTAddress);
-        currentToken.transferFrom(address(this), to, tokenId);
+        currentToken.safeTransferFrom(address(this), to, tokenId);
     }
 }
