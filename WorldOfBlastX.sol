@@ -2,6 +2,7 @@
 pragma solidity ^0.8.2;
 import "@openzeppelin/contracts/utils/math/SafeMath.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "@openzeppelin/contracts/access/Ownable.sol";
 
 contract ERC20 is IERC20 {
     using SafeMath for uint256;
@@ -103,11 +104,10 @@ interface IERC20Detailed {
     function decimals() external view returns (uint8 _decimals);
 }
 
-contract WorldOfBlastX is ERC20, IERC20Detailed {
+contract WorldOfBlastX is ERC20, IERC20Detailed, Ownable {
     string public name;
     string public symbol;
     uint8 public decimals;
-    address payable public owner;
 
     IERC20 private CONTRACTERC20;
 
@@ -125,7 +125,7 @@ contract WorldOfBlastX is ERC20, IERC20Detailed {
 
     uint256 public annualInterestRate = 2;
 
-    constructor() {
+    constructor() Ownable(msg.sender) {
         string memory _name = "World Of Blast X";
         string memory _symbol = "WOBX";
         uint8 _decimals = 18;
@@ -135,12 +135,6 @@ contract WorldOfBlastX is ERC20, IERC20Detailed {
         name = _name;
         symbol = _symbol;
         decimals = _decimals;
-        owner = payable(msg.sender);
-    }
-
-    modifier onlyOwner() {
-        require(msg.sender == owner, "Only the owner");
-        _;
     }
 
     function withdrawERC20(
@@ -241,5 +235,47 @@ contract WorldOfBlastX is ERC20, IERC20Detailed {
             totalInterest += reward;
         }
         return totalInterest;
+    }
+
+    function getFrozenRecords(address _user)
+        external
+        view
+        returns (FreezeRecord[] memory, uint256)
+    {
+        FreezeRecord[] memory records = frozenBalances[_user];
+        uint256 totalFrozen;
+        for (uint256 i = 0; i < records.length; i++) {
+            totalFrozen += records[i].amount;
+        }
+        return (records, totalFrozen);
+    }
+
+    function getFreezeDetails(address _user)
+        external
+        view
+        returns (
+            uint256[] memory indexes,
+            uint256[] memory amounts,
+            uint256[] memory rewards
+        )
+    {
+        uint256 freezeCount = frozenBalances[_user].length;
+        indexes = new uint256[](freezeCount);
+        amounts = new uint256[](freezeCount);
+        rewards = new uint256[](freezeCount);
+
+        for (uint256 i = 0; i < freezeCount; i++) {
+            FreezeRecord storage record = frozenBalances[_user][i];
+            uint256 freezeTime = block.timestamp - record.timestamp;
+            uint256 reward = (record.amount *
+                record.interestRate *
+                freezeTime) /
+                (365 days) /
+                100;
+
+            indexes[i] = i;
+            amounts[i] = record.amount;
+            rewards[i] = reward;
+        }
     }
 }
