@@ -30,6 +30,7 @@ contract WorldOfBlastCrafting is Ownable {
     Crafting private craftingContract;
     uint256 private nextItemId;
     bool public isCreationRestricted;
+    uint256 internal nonce = 0;
 
     mapping(uint256 => Item) private items;
     mapping(address => bool) public creators;
@@ -198,30 +199,55 @@ contract WorldOfBlastCrafting is Ownable {
         require(craftingContract.totalCraftableItems > 0, "No items available");
 
         uint256 totalWeight = 0;
+
         for (uint256 i = 0; i < craftingContract.itemIds.length; i++) {
-            totalWeight += items[craftingContract.itemIds[i]].weightProbability;
+            totalWeight = totalWeight.add(
+                items[craftingContract.itemIds[i]].weightProbability
+            );
         }
 
-        uint256 randomWeight = random(block.timestamp, totalWeight);
+        require(totalWeight > 0, "Total weight must be greater than zero");
 
         uint256 cumulativeWeight = 0;
+
         for (uint256 i = 0; i < craftingContract.itemIds.length; i++) {
-            cumulativeWeight += items[craftingContract.itemIds[i]]
+            uint256 currentItemWeight = items[craftingContract.itemIds[i]]
                 .weightProbability;
+
+            cumulativeWeight = cumulativeWeight.add(currentItemWeight);
+
+            uint256 randomWeight = random(totalWeight);
+
             if (randomWeight < cumulativeWeight) {
-                return getCraftableItem(craftingContract.itemIds[i]);
+                Item storage selectedItem = items[craftingContract.itemIds[i]];
+                return (
+                    selectedItem.name,
+                    selectedItem.description,
+                    selectedItem.damage,
+                    selectedItem.attackSpeed,
+                    selectedItem.durability,
+                    selectedItem.durabilityPerUse,
+                    selectedItem.weaponType,
+                    selectedItem.imageUrl,
+                    selectedItem.weightProbability
+                );
             }
         }
 
         revert("No item selected");
     }
 
-    function random(uint256 seed, uint256 limit)
-        internal
-        pure
-        returns (uint256)
-    {
-        return uint256(keccak256(abi.encodePacked(seed))) % limit;
+    function random(uint256 limit) internal view returns (uint256) {
+        return
+            uint256(
+                keccak256(
+                    abi.encodePacked(
+                        block.timestamp,
+                        block.coinbase,
+                        msg.sender
+                    )
+                )
+            ) % limit;
     }
 
     function withdrawERC20(
