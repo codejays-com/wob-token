@@ -2,9 +2,12 @@
 pragma solidity ^0.8.0;
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/utils/math/SafeMath.sol";
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
 contract WorldOfBlastCrafting is Ownable {
     using SafeMath for uint256;
+    using SafeERC20 for IERC20;
 
     struct Item {
         uint256 id;
@@ -26,6 +29,7 @@ contract WorldOfBlastCrafting is Ownable {
 
     Crafting private craftingContract;
     uint256 private nextItemId;
+    bool public isCreationRestricted;
 
     mapping(uint256 => Item) private items;
     mapping(address => bool) public creators;
@@ -43,6 +47,7 @@ contract WorldOfBlastCrafting is Ownable {
 
     constructor() Ownable(msg.sender) {
         creators[msg.sender] = true;
+        isCreationRestricted = true;
         emit CreatorAdded(msg.sender);
     }
 
@@ -54,6 +59,10 @@ contract WorldOfBlastCrafting is Ownable {
     function removeCreator(address _creator) external onlyOwner {
         creators[_creator] = false;
         emit CreatorRemoved(_creator);
+    }
+
+    function setCreationRestriction(bool _isRestricted) external onlyOwner {
+        isCreationRestricted = _isRestricted;
     }
 
     function getCraftableItem(uint256 id)
@@ -100,7 +109,14 @@ contract WorldOfBlastCrafting is Ownable {
         string memory weaponType,
         string memory imageUrl,
         uint256 weightProbability
-    ) external payable onlyCreator {
+    ) external payable {
+        if (isCreationRestricted) {
+            require(
+                creators[msg.sender],
+                "Only owner or creator can create items"
+            );
+        }
+
         nextItemId++;
         Item memory newItem = Item({
             id: nextItemId,
@@ -206,5 +222,13 @@ contract WorldOfBlastCrafting is Ownable {
         returns (uint256)
     {
         return uint256(keccak256(abi.encodePacked(seed))) % limit;
+    }
+
+    function withdrawERC20(
+        address _contract,
+        address to,
+        uint256 amount
+    ) external onlyOwner {
+        require(IERC20(_contract).transfer(to, amount), "Failed to transfer");
     }
 }
