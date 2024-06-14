@@ -30,7 +30,6 @@ contract WorldOfBlastCrafting is Ownable {
     Crafting private craftingContract;
     uint256 private nextItemId;
     bool public isCreationRestricted;
-    uint256 internal nonce = 0;
 
     mapping(uint256 => Item) private items;
     mapping(address => bool) public creators;
@@ -238,14 +237,14 @@ contract WorldOfBlastCrafting is Ownable {
     }
 
     function random(uint256 limit) internal view returns (uint256) {
+        uint256 randomIndex = uint256(
+            keccak256(abi.encodePacked(block.timestamp))
+        ) % 9999999999;
+
         return
             uint256(
                 keccak256(
-                    abi.encodePacked(
-                        block.timestamp,
-                        block.coinbase,
-                        msg.sender
-                    )
+                    abi.encodePacked(block.timestamp, randomIndex, msg.sender)
                 )
             ) % limit;
     }
