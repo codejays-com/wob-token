@@ -25,7 +25,6 @@ interface IWorldOfBlastCrafting {
 
     function drawCraftableItem()
         external
-        view
         returns (
             string memory name,
             string memory description,
@@ -388,13 +387,13 @@ contract WorldOfBlastNft is ERC721Enumerable, ERC721URIStorage, Ownable {
         return string(bstr);
     }
 
-        // The following functions are overrides required by Solidity.
+    // The following functions are overrides required by Solidity.
 
-    function _update(address to, uint256 tokenId, address auth)
-        internal
-        override(ERC721, ERC721Enumerable)
-        returns (address)
-    {
+    function _update(
+        address to,
+        uint256 tokenId,
+        address auth
+    ) internal override(ERC721, ERC721Enumerable) returns (address) {
         return super._update(to, tokenId, auth);
     }
 
