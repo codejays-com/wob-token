@@ -126,8 +126,8 @@ contract WorldOfBlastX is ERC20, IERC20Detailed, Ownable {
     uint256 public annualInterestRate = 2;
 
     constructor() Ownable(msg.sender) {
-        string memory _name = "World Of Blast X";
-        string memory _symbol = "WOBX";
+        string memory _name = "World Of Blast x";
+        string memory _symbol = "WOBx";
         uint8 _decimals = 18;
         uint256 _initialSupply = 1000000000;
         totalSupply = _initialSupply * 10**uint256(_decimals);
