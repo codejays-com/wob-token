@@ -104,7 +104,7 @@ interface IERC20Detailed {
     function decimals() external view returns (uint8 _decimals);
 }
 
-contract WorldOfBlastX is ERC20, IERC20Detailed, Ownable {
+contract WOBx is ERC20, IERC20Detailed, Ownable {
     string public name;
     string public symbol;
     uint8 public decimals;
