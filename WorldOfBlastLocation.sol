@@ -141,9 +141,27 @@ contract WorldOfBlastLocation is ERC721URIStorage, Ownable {
         monsters[tokenId].name = name;
     }
 
-    function getMonster(uint256 tokenId) public view returns (Monster memory) {
+    function getMonsterDetails(uint256 tokenId)
+        public
+        view
+        returns (
+            uint256 id,
+            string memory name,
+            string memory img,
+            uint256 hp,
+            uint256 weight,
+            uint256 damage
+        )
+    {
         Monster memory monster = monsters[tokenId];
-        return monster;
+        return (
+            monster.id,
+            monster.name,
+            monster.img,
+            monster.hp,
+            monster.weight,
+            monster.damage
+        );
     }
 
     function tokenURI(uint256 tokenId)
