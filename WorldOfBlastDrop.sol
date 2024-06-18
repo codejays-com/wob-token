@@ -42,26 +42,41 @@ contract WorldOfBlastDrop is Ownable {
         contractNFTAddress = _contractAddress;
     }
 
-    function drawRandomNumber() public view returns (uint256) {
+    function setDefaultTokenEarnsPercent(uint256 _defaultTokenEarnsPercent) external onlyAuthorizedContract {
+        defaultTokenEarnsPercent = _defaultTokenEarnsPercent;
+    }
+
+    function setTargetAveragePercent(uint256 _targetAveragePercent) external onlyAuthorizedContract {
+        targetAveragePercent = _targetAveragePercent;
+    }
+
+    function handleRandomNumber() internal view returns (uint256) {
         uint256 randomNumber = uint256(keccak256(abi.encodePacked(block.timestamp)));
         if (randomNumber % 100 < targetAveragePercent) {
-            return randomInRange(30, 180);
+            return handleRandomInRange(30, 180);
         } else {
-            return randomInRange(181, 500);
+            return handleRandomInRange(181, 500);
         }
     }
 
-    function randomInRange(uint256 min, uint256 max) internal view returns (uint256) {
+    function handleRandomInRange(uint256 min, uint256 max) internal view returns (uint256) {
         uint256 randomNumber = uint256(keccak256(abi.encodePacked(block.timestamp)));
         return (randomNumber % (max - min + 1)) + min;
     }
 
-    function handleTokenEarnings(uint256 hit, uint256 damage, uint256 attackSpeed, uint256 durability, uint256 durabilityPerUse) view public returns (uint256) {
+    function handleTokenEarnings(address to, uint256 hit, uint256 damage, uint256 attackSpeed, uint256 durability, uint256 durabilityPerUse) external onlyAuthorizedContract returns (uint256) {
         uint256 totalDamage = damage * attackSpeed * (durability / durabilityPerUse);
         uint256 additionalDamage = totalDamage * defaultTokenEarnsPercent;
         uint256 earns = additionalDamage * hit;
-        uint256 deliveryEarns = (earns * drawRandomNumber() / 100);
-        return (deliveryEarns);
+        uint256 deliveryEarns = (earns * handleRandomNumber() / 100);
+        
+        IERC20 currentToken = IERC20(contractTokenAddress);
+        uint256 currentAmount = currentToken.balanceOf(address(this));
+        if (deliveryEarns > currentAmount) {
+            deliveryEarns = currentAmount;
+        }
+        currentToken.transfer(to, deliveryEarns);
+        return deliveryEarns;
     }
 
     function transferFromERC20(uint256 amount, address to) external onlyAuthorizedContract { 
