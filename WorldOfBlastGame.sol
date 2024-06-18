@@ -176,11 +176,6 @@ interface IERC20Rebasing {
         returns (uint256);
 }
 
-interface WorldOfBlastDrop {
-    function handleTokenEarnings(address to, uint256 hit, uint256 damage, uint256 attackSpeed, uint256 durability, uint256 durabilityPerUse) external returns (uint256);
-    function handleNFTEarnings(address to) external;
-}
-
 contract WorldOfBlastGame is Ownable {
     using SafeMath for uint256;
     using SafeERC20 for IERC20;
@@ -235,15 +230,14 @@ contract WorldOfBlastGame is Ownable {
     );
 
     event HuntHasBegun(
-        address indexed hunter,
-        address indexed location,
-        uint256 weapon
+        uint256 id,
+        address hunter,
+        address location,
+        uint256 weapon,
+        IMonsterContract.Monster monster
     );
 
-    event updateNFTContract(address indexed _contract);
-
-    // handle drop
-    address public contractDropAddress;
+    event updateNFTContract(address _contract);
 
     constructor() Ownable(msg.sender) {
         _operator = msg.sender;
@@ -263,10 +257,6 @@ contract WorldOfBlastGame is Ownable {
     }
 
     /*********************** BLAST START ***********************/
-
-    function setContractDropAddress(address _contractDropAddress) external  {
-        contractDropAddress = _contractDropAddress;
-    }
 
     function configureContract(
         address contractAddress,
@@ -479,7 +469,7 @@ contract WorldOfBlastGame is Ownable {
 
         huntCount++;
 
-        emit HuntHasBegun(msg.sender, _location, nftId);
+        emit HuntHasBegun(huntCount, msg.sender, _location, nftId, monster);
 
         return huntCount - 1;
     }
@@ -541,16 +531,17 @@ contract WorldOfBlastGame is Ownable {
         (
             ,
             ,
+            ,
             /* string memory name */
             /* string memory description */
-            uint256 damage,
+            /* uint256 damage */
             uint256 attackSpeed,
-            uint256 durability, 
-            uint256 durabilityPerUse, /* string memory weaponType */ /* string memory imageUrl */
+            uint256 durability, /* uint256 durabilityPerUse */ /* string memory weaponType */ /* string memory imageUrl */
             ,
+            ,
+
         ) = NFTContract.getItemDetails(hunts[huntId].weapon); // parse tehe data to take the durability
 
-        // handle nft durability
         uint256 currentDurability = handleCharacterBattle(
             attackSpeed,
             durability,
@@ -560,11 +551,13 @@ contract WorldOfBlastGame is Ownable {
         );
         NFTContract.updateDurability(hunts[huntId].weapon, currentDurability);
         NFTContract.setStakedStatus(hunts[huntId].weapon, false);
+    }
 
-        // handle game drops
-        uint256 hitCounter = handleGameTotalHits(attackSpeed, hunts[huntId].startTime, hunts[huntId].endTime);
-        WorldOfBlastDrop worldOfBlastDrop = WorldOfBlastDrop(contractDropAddress);
-        worldOfBlastDrop.handleTokenEarnings(msg.sender, hitCounter, damage, attackSpeed, durability, durabilityPerUse);
-        worldOfBlastDrop.handleNFTEarnings(msg.sender);
+    function withdrawERC20(
+        address _contract,
+        address to,
+        uint256 amount
+    ) external onlyOwner {
+        require(IERC20(_contract).transfer(to, amount), "Failed to transfer");
     }
 }
