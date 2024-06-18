@@ -13,6 +13,10 @@ contract WorldOfBlastDrop is Ownable {
     address private contractTokenAddress;
     address private contractNFTAddress;
 
+    uint256 constant PERCENT_MULTIPLIER = 1000000000000000000;
+    uint256 public defaultTokenEarnsPercent = 3381000000000; // 0.00003381 percent
+    uint256 public targetAveragePercent = 98;
+
     mapping(address => bool) public authorizedToUseContract;
 
     constructor(address _contractTokenAddress, address _contractNFTAddress) Ownable(msg.sender) {
@@ -36,6 +40,28 @@ contract WorldOfBlastDrop is Ownable {
 
     function setContractNFTAddress(address _contractAddress) external onlyAuthorizedContract {
         contractNFTAddress = _contractAddress;
+    }
+
+    function drawRandomNumber() public view returns (uint256) {
+        uint256 randomNumber = uint256(keccak256(abi.encodePacked(block.timestamp)));
+        if (randomNumber % 100 < targetAveragePercent) {
+            return randomInRange(30, 180);
+        } else {
+            return randomInRange(181, 500);
+        }
+    }
+
+    function randomInRange(uint256 min, uint256 max) internal view returns (uint256) {
+        uint256 randomNumber = uint256(keccak256(abi.encodePacked(block.timestamp)));
+        return (randomNumber % (max - min + 1)) + min;
+    }
+
+    function handleTokenEarnings(uint256 hit, uint256 damage, uint256 attackSpeed, uint256 durability, uint256 durabilityPerUse) view public returns (uint256) {
+        uint256 totalDamage = damage * attackSpeed * (durability / durabilityPerUse);
+        uint256 additionalDamage = totalDamage * defaultTokenEarnsPercent;
+        uint256 earns = additionalDamage * hit;
+        uint256 deliveryEarns = (earns * drawRandomNumber() / 100);
+        return (deliveryEarns);
     }
 
     function transferFromERC20(uint256 amount, address to) external onlyAuthorizedContract { 
