@@ -246,8 +246,7 @@ contract WorldOfBlastGame is Ownable {
         uint256 id,
         address hunter,
         address location,
-        uint256 weapon,
-        IMonsterContract.Monster monster
+        uint256 weapon
     );
 
     event updateNFTContract(address indexed _contract);
@@ -489,7 +488,7 @@ contract WorldOfBlastGame is Ownable {
 
         huntCount++;
 
-        emit HuntHasBegun(huntCount, msg.sender, _location, nftId, monster);
+        emit HuntHasBegun(huntCount, msg.sender, _location, nftId);
 
         return huntCount - 1;
     }
