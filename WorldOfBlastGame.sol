@@ -264,6 +264,10 @@ contract WorldOfBlastGame is Ownable {
 
     /*********************** BLAST START ***********************/
 
+    function setContractDropAddress(address _contractDropAddress) external  {
+        contractDropAddress = _contractDropAddress;
+    }
+
     function configureContract(
         address contractAddress,
         YieldMode _yield,
