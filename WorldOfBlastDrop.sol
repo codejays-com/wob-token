@@ -14,7 +14,7 @@ contract WorldOfBlastDrop is Ownable {
     address private contractNFTAddress;
 
     uint256 constant PERCENT_MULTIPLIER = 1000000000000000000;
-    uint256 public defaultTokenEarnsPercent = 3381000000000; // 0.00003381 percent
+    uint256 public defaultTokenEarnsPercent = 338100000000; // 0.00003381 percent
     uint256 public targetAveragePercent = 98;
 
     mapping(address => bool) public authorizedToUseContract;
