@@ -229,7 +229,13 @@ contract WorldOfBlastGame is Ownable {
         address indexed newOperator
     );
 
-    event HuntHasBegun(address hunter, address location, uint256 weapon);
+    event HuntHasBegun(
+        address indexed hunter,
+        address indexed location,
+        uint256 weapon
+    );
+
+    event updateNFTContract(address indexed _contract);
 
     constructor() Ownable(msg.sender) {
         _operator = msg.sender;
@@ -423,25 +429,15 @@ contract WorldOfBlastGame is Ownable {
 
     /*********************** BLAST END  ***********************/
 
-    function addLocation(address _monsterContractAddress) public {
-        locations.push(_monsterContractAddress);
-    }
-
-    function removeLocation(uint256 index) public {
-        require(index < locations.length, "Invalid index");
-        locations[index] = locations[locations.length - 1];
-        locations.pop();
-    }
-
     function setNFTContract(address _nftContractAddress) public {
         NFTContract = IExtendedERC721(_nftContractAddress);
+        emit updateNFTContract(_nftContractAddress);
     }
 
-    function startHunt(uint256 locationId, uint256 nftId)
+    function startHunt(address _location, uint256 nftId)
         public
         returns (uint256)
     {
-        require(locationId < locations.length, "Invalid location ID");
         require(
             NFTContract.ownerOf(nftId) == msg.sender,
             "Not the owner of the NFT"
@@ -450,8 +446,6 @@ contract WorldOfBlastGame is Ownable {
         require(huntStartTimes[msg.sender] == 0, "Hunt already started");
 
         NFTContract.setStakedStatus(nftId, true);
-
-        address _location = locations[locationId];
 
         IMonsterContract monsterContract = IMonsterContract(_location);
 
