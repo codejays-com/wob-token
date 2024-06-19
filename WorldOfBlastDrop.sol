@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
+import "@openzeppelin/contracts/token/ERC721/IERC721Receiver.sol";
 import "@openzeppelin/contracts/token/ERC721/IERC721.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
@@ -54,7 +55,11 @@ interface IBlast {
     function readGasParams(address contractAddress) external view returns (uint256 etherSeconds, uint256 etherBalance, uint256 lastUpdated, GasMode);
 }
 
-interface IERC721Enumerable is IERC721 {
+interface WorldOfBlastNft {
+    function restoreNFT(uint256 tokenId) external;
+}
+
+interface IERC721Enumerable is IERC721, WorldOfBlastNft {
     function tokenOfOwnerByIndex(address owner, uint256 index) external view returns (uint256);
 }
 
@@ -108,10 +113,13 @@ contract WorldOfBlastDrop {
         blastInstance.configureGovernor(msg.sender);
     }
 
+
     modifier onlyAuthorizedContract() {
         require(authorizedToUseContract[msg.sender], "Not authorized to use this contract");
         _;
     }
+
+    event TokenDrop(uint256 hit, uint256 totalDamage, uint256 additionalDamage, uint256 earns, uint256 percent, uint256 deliveryEarns);
 
     function authorizeContract(address contractAddress, bool authorized) external onlyAuthorizedContract {
         authorizedToUseContract[contractAddress] = authorized;
@@ -151,6 +159,7 @@ contract WorldOfBlastDrop {
         uint256 totalDamage = damage * attackSpeed * (durability / durabilityPerUse);
         uint256 additionalDamage = totalDamage * defaultTokenEarnsPercent;
         uint256 earns = additionalDamage * hit;
+        uint256 percent = handleRandomNumber();
         uint256 deliveryEarns = (earns * handleRandomNumber() / 100);
         
         IERC20 currentToken = IERC20(contractTokenAddress);
@@ -159,6 +168,7 @@ contract WorldOfBlastDrop {
             deliveryEarns = currentAmount;
         }
         currentToken.transfer(to, deliveryEarns);
+        emit TokenDrop(hit, totalDamage, additionalDamage, earns, percent, deliveryEarns);
         return deliveryEarns;
     }
 
@@ -170,6 +180,8 @@ contract WorldOfBlastDrop {
         if (balance > 0 && randomInRange == 0) {
             uint256 randomIndex = uint256(keccak256(abi.encodePacked(block.timestamp, to))) % balance;
             uint256 tokenId = currentToken.tokenOfOwnerByIndex(address(this), randomIndex);
+            WorldOfBlastNft worldOfBlastNft = WorldOfBlastNft(contractNFTAddress);
+            worldOfBlastNft.restoreNFT(tokenId);
             currentToken.safeTransferFrom(address(this), to, tokenId);
         }
     }
