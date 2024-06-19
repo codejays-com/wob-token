@@ -46,7 +46,7 @@ Dungeon: 0xf586b82b376ebde1a7407d02ebe2db80d072ce3a
 ```
 #### GAME
 ```shell
-0xc9B608D6d1f6b310e85487012F514fcABc53E8F9
+0x457cf6a25ebb31ca7c9302b20768a2489c2af930
 ```
 
 #### DROP
