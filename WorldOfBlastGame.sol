@@ -206,7 +206,7 @@ contract WorldOfBlastGame is Ownable {
     }
 
     address[] public locations;
-    uint256 public huntCount;
+    uint256 public huntCount = 1;
     address public _operator;
 
     IBlast public constant BLAST =
@@ -243,13 +243,25 @@ contract WorldOfBlastGame is Ownable {
     );
 
     event HuntHasBegun(
-        uint256 id,
+        uint256 indexed id,
+        uint256 startTime,
+        uint256 weapon,
         address hunter,
         address location,
-        uint256 weapon
+        string monster
     );
 
-    event updateNFTContract(address indexed _contract);
+    event HuntEnd(
+        uint256 indexed id,
+        uint256 startTime,
+        uint256 endTime,
+        uint256 hitCounter,
+        uint256 durability
+    );
+
+    event updateNFTContract(address _contract);
+
+    event updateDropContract(address _contract);
 
     // handle drop
     address public contractDropAddress;
@@ -272,10 +284,6 @@ contract WorldOfBlastGame is Ownable {
     }
 
     /*********************** BLAST START ***********************/
-
-    function setContractDropAddress(address _contractDropAddress) external {
-        contractDropAddress = _contractDropAddress;
-    }
 
     function configureContract(
         address contractAddress,
@@ -450,9 +458,17 @@ contract WorldOfBlastGame is Ownable {
 
     /*********************** BLAST END  ***********************/
 
-    function setNFTContract(address _nftContractAddress) public {
+    function setNFTContract(address _nftContractAddress) public onlyOwner {
         NFTContract = IExtendedERC721(_nftContractAddress);
         emit updateNFTContract(_nftContractAddress);
+    }
+
+    function setContractDropAddress(address _contractDropAddress)
+        external
+        onlyOwner
+    {
+        contractDropAddress = _contractDropAddress;
+        emit updateDropContract(_contractDropAddress);
     }
 
     function startHunt(address _location, uint256 nftId)
@@ -472,6 +488,8 @@ contract WorldOfBlastGame is Ownable {
 
         IMonsterContract.Monster memory monster = monsterContract.drawMonster();
 
+        huntCount++;
+
         Hunt memory newHunt = Hunt({
             id: huntCount,
             hunter: msg.sender,
@@ -486,11 +504,16 @@ contract WorldOfBlastGame is Ownable {
 
         huntStartTimes[msg.sender] = block.timestamp;
 
-        huntCount++;
+        emit HuntHasBegun(
+            huntCount,
+            newHunt.startTime,
+            nftId,
+            msg.sender,
+            _location,
+            monster.name
+        );
 
-        emit HuntHasBegun(huntCount, msg.sender, _location, nftId);
-
-        return huntCount - 1;
+        return huntCount;
     }
 
     function handleGameTotalHits(
@@ -568,8 +591,6 @@ contract WorldOfBlastGame is Ownable {
             hunts[huntId].endTime,
             hunts[huntId].monster.weight
         );
-        NFTContract.updateDurability(hunts[huntId].weapon, currentDurability);
-        NFTContract.setStakedStatus(hunts[huntId].weapon, false);
 
         // handle game drops
         uint256 hitCounter = handleGameTotalHits(
@@ -577,9 +598,23 @@ contract WorldOfBlastGame is Ownable {
             hunts[huntId].startTime,
             hunts[huntId].endTime
         );
+
+        emit HuntEnd(
+            huntId,
+            hunts[huntId].startTime,
+            hunts[huntId].endTime,
+            hitCounter,
+            currentDurability
+        );
+
+        NFTContract.updateDurability(hunts[huntId].weapon, currentDurability);
+
+        NFTContract.setStakedStatus(hunts[huntId].weapon, false);
+
         WorldOfBlastDrop worldOfBlastDrop = WorldOfBlastDrop(
             contractDropAddress
         );
+
         worldOfBlastDrop.handleTokenEarnings(
             msg.sender,
             hitCounter,
