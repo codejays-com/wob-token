@@ -561,7 +561,6 @@ contract WorldOfBlastGame is Ownable {
     }
 
     function endHunt(uint256 huntId) public {
-        require(huntId < huntCount, "Invalid hunt ID");
         require(
             hunts[huntId].hunter == msg.sender,
             "Not the hunter of this hunt"
@@ -569,7 +568,6 @@ contract WorldOfBlastGame is Ownable {
         require(hunts[huntId].endTime == 0, "Hunt already ended");
         hunts[huntId].endTime = block.timestamp;
         huntStartTimes[msg.sender] = 0;
-
         (
             ,
             ,
