@@ -1,4 +1,4 @@
-### MAIN NET
+## MAIN NET
 
 #### WOB:
 ```shell
@@ -14,7 +14,7 @@
 0xa1724464831F5a2c75609A4207725552CC225dEf
 ```
 
-### TESTNET
+## TESTNET
 
 #### WOB:
 ```shell
@@ -44,8 +44,12 @@
 ```shell
 Dungeon: 0xf586b82b376ebde1a7407d02ebe2db80d072ce3a
 ```
+#### GAME
+```shell
+0xDE4bCBb0997D12ED9D0B1BAABa2d005f5b92F23a
+```
 
-#### Drop:
+#### DROP
 ```shell
 0xd526c5ffD05978115134202366E9022c930f019a
 ```
