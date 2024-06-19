@@ -103,12 +103,11 @@ contract WorldOfBlastNft is ERC721URIStorage, Ownable {
         _;
     }
 
-    constructor(address _crafting, address _wob)
-        ERC721("World Of Blast", "WOBNFTs")
-        Ownable(msg.sender)
-    {
-        WOB = IERC20(_wob);
-        craftingContract = IWorldOfBlastCrafting(_crafting);
+    constructor() ERC721("World Of Blast", "WOBNFTs") Ownable(msg.sender) {
+        WOB = IERC20(0x0BCAEec9dF553b0E59a0928FCCd9dcf8C0b42601); // testnet
+        craftingContract = IWorldOfBlastCrafting(
+            0x09601Ed5c5eD0CFbaa2780e15D0a618DDADB7e0B
+        ); // testnet
         _owner = payable(msg.sender);
         _contractURI = "https://worldofblast.com/assets/contract.json";
         creators[msg.sender] = true;
