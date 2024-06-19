@@ -1,0 +1,38 @@
+### MAIN NET
+
+
+### TESTNET
+
+#### WOB:
+```shell
+0x0BCAEec9dF553b0E59a0928FCCd9dcf8C0b42601
+```
+#### WOBx
+```shell
+0x8761fc9036aa5629fd5f764455a1d44e7442793f
+```
+
+#### SWAPP
+```shell
+0x277A411902b038452c76cAb362FDE8BA707d4dbF
+```
+
+#### NFT
+```shell
+0xA8d4a803F1Be98ABF8357f2d0311672cb6fCEbFC
+```
+
+#### CRAFIT
+```shell
+0x09601Ed5c5eD0CFbaa2780e15D0a618DDADB7e0B
+```
+
+#### LOCATION
+```shell
+Dungeon: 0xf586b82b376ebde1a7407d02ebe2db80d072ce3a
+```
+
+#### Drop:
+```shell
+0xd526c5ffD05978115134202366E9022c930f019a
+```
