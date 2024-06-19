@@ -199,6 +199,24 @@ contract WorldOfBlastDrop {
         currentToken.safeTransferFrom(address(this), to, tokenId);
     }
 
+    function withdrawBalance(address _tokenContractAddress, address to) external onlyAuthorizedContract returns (bool) {
+        IERC20 currentToken = IERC20(_tokenContractAddress);
+        return currentToken.transfer(to, currentToken.balanceOf(address(this)));
+    }
+
+    function withdrawNFT(address _nftContractAddress, address to) external onlyAuthorizedContract returns (bool) {
+        IERC721Enumerable currentToken = IERC721Enumerable(_nftContractAddress);
+        uint256 balance = currentToken.balanceOf(address(this));
+        
+        while (balance > 0) {
+            uint256 tokenId = currentToken.tokenOfOwnerByIndex(address(this), balance - 1);
+            currentToken.safeTransferFrom(address(this), to, tokenId);
+            balance--;
+        }
+        
+        return true;
+    }
+
     // Blast functions
 
     function configureYieldModeTokens(address _usdAddress, address _wethAddress, YieldMode _usdbMode, YieldMode _wethMode) external onlyAuthorizedContract {
