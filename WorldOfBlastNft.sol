@@ -54,9 +54,11 @@ contract WorldOfBlastNft is ERC721URIStorage, Ownable {
     }
 
     IERC20 private WOB;
+
     IWorldOfBlastCrafting private craftingContract;
 
     address payable public _owner;
+    address public _addressSendWOB;
     uint256 public priceToCreateNftWOB;
     uint256 public tokenIdCounter;
     string public _contractURI;
@@ -110,6 +112,7 @@ contract WorldOfBlastNft is ERC721URIStorage, Ownable {
         _owner = payable(msg.sender);
         _contractURI = "https://worldofblast.com/assets/contract.json";
         creators[msg.sender] = true;
+        _addressSendWOB = address(this);
     }
 
     function withdrawERC20(
@@ -134,6 +137,10 @@ contract WorldOfBlastNft is ERC721URIStorage, Ownable {
 
     function contractURI() public view returns (string memory) {
         return _contractURI;
+    }
+
+    function updateAddressSendWOB(address _address) external onlyOwner {
+        _addressSendWOB = _address;
     }
 
     function updatePriceToCreateNftWOB(uint256 price) external onlyOwner {
@@ -189,7 +196,7 @@ contract WorldOfBlastNft is ERC721URIStorage, Ownable {
             "Insufficient WOB balance"
         );
         require(
-            WOB.transferFrom(msg.sender, address(this), priceWOB),
+            WOB.transferFrom(msg.sender, _addressSendWOB, priceWOB),
             "Failed to transfer WOB"
         );
 
