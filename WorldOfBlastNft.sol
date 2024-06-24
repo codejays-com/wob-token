@@ -23,7 +23,7 @@ interface IWorldOfBlastCrafting {
             uint256 weightProbability
         );
 
-    function drawCraftableItem()
+    function drawCraftableItem(uint256 x)
         external
         view
         returns (
@@ -55,9 +55,9 @@ contract WorldOfBlastNft is ERC721Enumerable, ERC721URIStorage, Ownable {
         bool isStaked;
     }
 
-    IERC20 private WOB;
+    IERC20 public WOB;
 
-    IWorldOfBlastCrafting private craftingContract;
+    IWorldOfBlastCrafting public craftingContract;
 
     address payable public _owner;
     address public _addressSendWOB;
@@ -113,10 +113,12 @@ contract WorldOfBlastNft is ERC721Enumerable, ERC721URIStorage, Ownable {
     }
 
     constructor() ERC721("World Of Blast", "WOBNFTs") Ownable(msg.sender) {
-        WOB = IERC20(0x0BCAEec9dF553b0E59a0928FCCd9dcf8C0b42601); // testnet
+        WOB = IERC20(0x0BCAEec9dF553b0E59a0928FCCd9dcf8C0b42601);
+
         craftingContract = IWorldOfBlastCrafting(
-            0x786ab9DEb46b9018aE8F3A243d582fa710ee0679
-        ); // testnet
+            0x231513051614d27203d7f58F11e4BeDa40F8d9aB
+        );
+
         _owner = payable(msg.sender);
         _contractURI = "https://worldofblast.com/assets/contract.json";
         creators[msg.sender] = true;
@@ -218,6 +220,7 @@ contract WorldOfBlastNft is ERC721Enumerable, ERC721URIStorage, Ownable {
 
         for (uint256 i = 0; i < quantity; i++) {
             uint256 tokenId = tokenIdCounter++;
+
             (
                 string memory name,
                 string memory description,
@@ -228,7 +231,8 @@ contract WorldOfBlastNft is ERC721Enumerable, ERC721URIStorage, Ownable {
                 string memory weaponType,
                 string memory imageUrl,
 
-            ) = craftingContract.drawCraftableItem();
+            ) = craftingContract.drawCraftableItem(tokenId);
+
             items[tokenId] = Item(
                 name,
                 description,
