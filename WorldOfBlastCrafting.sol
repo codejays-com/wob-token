@@ -215,7 +215,7 @@ contract WorldOfBlastCrafting is Ownable {
 
             cumulativeWeight = cumulativeWeight.add(currentItemWeight);
 
-            uint256 randomWeight = random(totalWeight);
+            uint256 randomWeight = random(totalWeight, i);
 
             if (randomWeight < cumulativeWeight) {
                 Item storage selectedItem = items[craftingContract.itemIds[i]];
@@ -236,15 +236,25 @@ contract WorldOfBlastCrafting is Ownable {
         revert("No item selected");
     }
 
-    function random(uint256 limit) internal view returns (uint256) {
+    function random(uint256 limit, uint256 index)
+        internal
+        view
+        returns (uint256)
+    {
         uint256 randomIndex = uint256(
-            keccak256(abi.encodePacked(block.timestamp))
-        ) % 9999999999;
+            keccak256(abi.encodePacked(block.timestamp, limit, index))
+        ) % 99999999999999;
 
         return
             uint256(
                 keccak256(
-                    abi.encodePacked(block.timestamp, randomIndex, msg.sender)
+                    abi.encodePacked(
+                        block.timestamp,
+                        randomIndex,
+                        index,
+                        limit,
+                        msg.sender
+                    )
                 )
             ) % limit;
     }
