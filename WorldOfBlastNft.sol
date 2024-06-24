@@ -115,7 +115,7 @@ contract WorldOfBlastNft is ERC721Enumerable, ERC721URIStorage, Ownable {
     constructor() ERC721("World Of Blast", "WOBNFTs") Ownable(msg.sender) {
         WOB = IERC20(0x0BCAEec9dF553b0E59a0928FCCd9dcf8C0b42601); // testnet
         craftingContract = IWorldOfBlastCrafting(
-            0x09601Ed5c5eD0CFbaa2780e15D0a618DDADB7e0B
+            0x786ab9DEb46b9018aE8F3A243d582fa710ee0679
         ); // testnet
         _owner = payable(msg.sender);
         _contractURI = "https://worldofblast.com/assets/contract.json";
@@ -354,6 +354,7 @@ contract WorldOfBlastNft is ERC721Enumerable, ERC721URIStorage, Ownable {
             uint256 attackSpeed,
             uint256 durability,
             uint256 durabilityPerUse,
+            uint256 maxDurability,
             string memory weaponType,
             string memory imageUrl
         )
@@ -366,6 +367,7 @@ contract WorldOfBlastNft is ERC721Enumerable, ERC721URIStorage, Ownable {
             item.attackSpeed,
             item.durability,
             item.durabilityPerUse,
+            item.maxDurability,
             item.weaponType,
             item.imageUrl
         );
