@@ -28,10 +28,10 @@ contract WorldOfBlastCrafting is Ownable {
     }
 
     Crafting private craftingContract;
-    uint256 private nextItemId;
+    uint256 public nextItemId;
     bool public isCreationRestricted;
 
-    mapping(uint256 => Item) private items;
+    mapping(uint256 => Item) public items;
     mapping(address => bool) public creators;
 
     event ItemCreated(uint256 indexed itemId, address indexed owner);
@@ -180,7 +180,7 @@ contract WorldOfBlastCrafting is Ownable {
         emit ItemDeleted(itemId);
     }
 
-    function drawCraftableItem()
+    function drawCraftableItem(uint256 nonce)
         public
         view
         returns (
@@ -209,15 +209,15 @@ contract WorldOfBlastCrafting is Ownable {
 
         uint256 cumulativeWeight = 0;
 
+        uint256 randomWeight = random(totalWeight, nonce);
+
         for (uint256 i = 0; i < craftingContract.itemIds.length; i++) {
             uint256 currentItemWeight = items[craftingContract.itemIds[i]]
                 .weightProbability;
 
             cumulativeWeight = cumulativeWeight.add(currentItemWeight);
 
-            uint256 randomWeight = random(totalWeight, i);
-
-            if (randomWeight < cumulativeWeight) {
+            if (randomWeight <= cumulativeWeight) {
                 Item storage selectedItem = items[craftingContract.itemIds[i]];
                 return (
                     selectedItem.name,
@@ -236,23 +236,21 @@ contract WorldOfBlastCrafting is Ownable {
         revert("No item selected");
     }
 
-    function random(uint256 limit, uint256 index)
+    function random(uint256 limit, uint256 nonce)
         internal
         view
         returns (uint256)
     {
         uint256 randomIndex = uint256(
-            keccak256(abi.encodePacked(block.timestamp, limit, index))
+            keccak256(abi.encodePacked(block.timestamp, limit, nonce))
         ) % 99999999999999;
-
         return
             uint256(
                 keccak256(
                     abi.encodePacked(
                         block.timestamp,
+                        nonce,
                         randomIndex,
-                        index,
-                        limit,
                         msg.sender
                     )
                 )
