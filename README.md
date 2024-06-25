@@ -31,6 +31,11 @@
 0x2C3337f4A5E62082eb4cb3A39D4119486B12B29F
 ```
 
+#### DROP
+```shell
+0x2147b7de7f0a7df2a3325eacdc965fe670eab132
+```
+
 ## DEVELOPER
 
 #### WOB:
