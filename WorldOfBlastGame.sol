@@ -229,6 +229,7 @@ contract WorldOfBlastGame is Ownable {
         IERC20Rebasing(0x4200000000000000000000000000000000000023);
 
     mapping(address => uint256) public huntStartTimes;
+    mapping(address => uint256) public activeHuntId;
 
     mapping(uint256 => Hunt) public hunts;
 
@@ -458,6 +459,37 @@ contract WorldOfBlastGame is Ownable {
 
     /*********************** BLAST END  ***********************/
 
+    function getActiveHuntDetails(address userAddress)
+        public
+        view
+        returns (
+            uint256 huntId,
+            address location,
+            uint256 weapon,
+            uint256 startTime,
+            uint256 endTime,
+            string memory monsterName,
+            uint256 monsterWeight
+        )
+    {
+        for (uint256 i = 1; i <= huntCount; i++) {
+            if (hunts[i].hunter == userAddress && hunts[i].endTime == 0) {
+                Hunt memory activeHunt = hunts[i];
+                return (
+                    activeHunt.id,
+                    activeHunt.location,
+                    activeHunt.weapon,
+                    activeHunt.startTime,
+                    activeHunt.endTime,
+                    activeHunt.monster.name,
+                    activeHunt.monster.weight
+                );
+            }
+        }
+
+        revert("No active hunt found for this user");
+    }
+
     function setNFTContract(address _nftContractAddress) public onlyOwner {
         NFTContract = IExtendedERC721(_nftContractAddress);
         emit updateNFTContract(_nftContractAddress);
@@ -501,6 +533,8 @@ contract WorldOfBlastGame is Ownable {
         });
 
         hunts[huntCount] = newHunt;
+
+        activeHuntId[msg.sender] = huntCount;
 
         huntStartTimes[msg.sender] = block.timestamp;
 
@@ -580,6 +614,8 @@ contract WorldOfBlastGame is Ownable {
             ,
 
         ) = NFTContract.getItemDetails(hunts[huntId].weapon); // parse tehe data to take the durability
+
+        activeHuntId[msg.sender] = 0;
 
         // handle nft durability
         uint256 currentDurability = handleCharacterBattle(
