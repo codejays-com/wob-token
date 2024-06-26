@@ -43,6 +43,7 @@ interface IExtendedERC721 is IERC721 {
             uint256 attackSpeed,
             uint256 durability,
             uint256 durabilityPerUse,
+            uint256 maxDurability,
             string memory weaponType,
             string memory imageUrl
         );
@@ -609,11 +610,13 @@ contract WorldOfBlastGame is Ownable {
             /* string memory description */
             uint256 damage,
             uint256 attackSpeed,
-            uint256 durability,
-            uint256 durabilityPerUse, /* string memory weaponType */ /* string memory imageUrl */
+            uint256 durability, /* string memory max */
+            uint256 durabilityPerUse, /* string memory weaponType */
+            ,
             ,
 
-        ) = NFTContract.getItemDetails(hunts[huntId].weapon); // parse tehe data to take the durability
+        ) = /* string memory imageUrl */
+            NFTContract.getItemDetails(hunts[huntId].weapon);
 
         activeHuntId[msg.sender] = 0;
 
@@ -657,6 +660,7 @@ contract WorldOfBlastGame is Ownable {
             durability,
             durabilityPerUse
         );
+
         worldOfBlastDrop.handleNFTEarnings(msg.sender);
     }
 }
