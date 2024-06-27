@@ -555,44 +555,38 @@ contract WorldOfBlastGame is Ownable {
         uint256 attackSpeed,
         uint256 startTime,
         uint256 endTime
-    ) internal pure returns (uint256) {
+    ) public pure returns (uint256) {
         require(startTime < endTime, "Start time must be before end time");
         uint256 duration = endTime - startTime;
-        uint256 totalHits = duration / (60 * attackSpeed); // 600 seconds = 10 minutes
+        uint256 totalHits = (duration * 10 / 5) * attackSpeed; // hit every 5 seconds
         return totalHits;
     }
 
     function handleCharacterBattle(
         uint256 attackSpeed,
         uint256 durability,
+        uint256 durabilityPerUse,
         uint256 startTime,
-        uint256 endTime,
-        uint256 monsterWeight
-    ) internal view returns (uint256) {
+        uint256 endTime
+    ) internal pure returns (uint256, uint256) {
         uint256 totalHitsQuantity = handleGameTotalHits(
             attackSpeed,
             startTime,
             endTime
         );
-        uint256 monsterAttack = monsterWeight;
-        uint128 baseCharacterDesense = 5;
 
-        for (uint128 index = 0; index < totalHitsQuantity; index++) {
-            uint256 atackCalculation = monsterAttack - baseCharacterDesense;
-            uint256 randomHash = uint256(
-                keccak256(abi.encodePacked(block.timestamp, index, msg.sender))
-            );
-
-            uint128 currentDamage = uint128(randomHash % atackCalculation);
-            if (durability - currentDamage < 0) {
+        uint256 hitsBeforeBroke = 0;
+        
+        for (uint256 index = 0; index < totalHitsQuantity; index++) {
+            if (durability <= 0) {
                 durability = 0;
                 break;
             } else {
-                durability -= currentDamage;
+                durability -= durabilityPerUse;
+                hitsBeforeBroke++;
             }
         }
-
-        return durability;
+        return (durability, hitsBeforeBroke);
     }
 
     function endHunt(uint256 huntId) public {
@@ -614,24 +608,16 @@ contract WorldOfBlastGame is Ownable {
             uint256 durabilityPerUse, /* string memory weaponType */
             ,
             ,
-
         ) = /* string memory imageUrl */
             NFTContract.getItemDetails(hunts[huntId].weapon);
 
         activeHuntId[msg.sender] = 0;
 
         // handle nft durability
-        uint256 currentDurability = handleCharacterBattle(
+        (uint256 currentDurability, uint256 hitCounter) = handleCharacterBattle(
             attackSpeed,
             durability,
-            hunts[huntId].startTime,
-            hunts[huntId].endTime,
-            hunts[huntId].monster.weight
-        );
-
-        // handle game drops
-        uint256 hitCounter = handleGameTotalHits(
-            attackSpeed,
+            durabilityPerUse,
             hunts[huntId].startTime,
             hunts[huntId].endTime
         );
