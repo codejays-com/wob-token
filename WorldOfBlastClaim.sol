@@ -16,10 +16,11 @@ interface IERC721Enumerable is IERC721, WorldOfBlastNft {
 contract WorldOfBlastClaim {
     address public contractTokenAddress;
     address public contractNFTAddress;
-    uint256 public defaultTokenEarnsPercent = 3381000000000; // 0.00003381 percent
-    uint256 public targetAveragePercent = 98;
 
     mapping(address => bool) public authorizedToUseContract;
+
+    mapping(address => bool) public isClaimbleAddress;
+    mapping(address => uint256) public claimbleNFTaddress;
 
     constructor(address _contractTokenAddress, address _contractNFTAddress) {
         contractTokenAddress = _contractTokenAddress;
@@ -32,6 +33,30 @@ contract WorldOfBlastClaim {
         _;
     }
 
+    function registerNFTtoClaim(address to, uint256 nftId) public {
+        isClaimbleAddress[to] = true;
+        claimbleNFTaddress[to] = nftId;
+    }
+
+    function registerNFTsToClaim(address[] memory to, uint256[] memory nftIds) public {
+        require(to.length == nftIds.length, "Address and NFT ID arrays must have the same length");
+
+        for (uint256 i = 0; i < to.length; i++) {
+            isClaimbleAddress[to[i]] = true;
+            claimbleNFTaddress[to[i]] = nftIds[i];
+        }
+    }
+
+    function claimFreeNftAvialable() public view returns (bool)  {
+        return isClaimbleAddress[msg.sender];
+    }
+
+    function claimFreeNft() public {
+        require(claimFreeNftAvialable(), "There are no NFTs available for claim.");
+        IERC721Enumerable currentToken = IERC721Enumerable(contractNFTAddress);
+        currentToken.safeTransferFrom(address(this), msg.sender, claimbleNFTaddress[msg.sender]);
+    }
+
     function authorizeContract(address contractAddress, bool authorized) external onlyAuthorizedContract {
         authorizedToUseContract[contractAddress] = authorized;
     }
@@ -42,26 +67,6 @@ contract WorldOfBlastClaim {
 
     function setContractNFTAddress(address _contractAddress) external onlyAuthorizedContract {
         contractNFTAddress = _contractAddress;
-    }
-
-    function setDefaultTokenEarnsPercent(uint256 _defaultTokenEarnsPercent) external onlyAuthorizedContract {
-        defaultTokenEarnsPercent = _defaultTokenEarnsPercent;
-    }
-
-    function setTargetAveragePercent(uint256 _targetAveragePercent) external onlyAuthorizedContract {
-        targetAveragePercent = _targetAveragePercent;
-    }
-
-    function handleNFTEarnings(address to) external onlyAuthorizedContract {
-        IERC721Enumerable currentToken = IERC721Enumerable(contractNFTAddress);
-        uint256 balance = currentToken.balanceOf(address(this));
-        if (balance > 0) {
-            uint256 randomIndex = uint256(keccak256(abi.encodePacked(block.timestamp, to))) % balance;
-            uint256 tokenId = currentToken.tokenOfOwnerByIndex(address(this), randomIndex);
-            WorldOfBlastNft worldOfBlastNft = WorldOfBlastNft(contractNFTAddress);
-            worldOfBlastNft.restoreNFT(tokenId);
-            currentToken.safeTransferFrom(address(this), to, tokenId);
-        }
     }
 
     function transferFromERC20(uint256 amount, address to) external onlyAuthorizedContract { 
@@ -92,7 +97,7 @@ contract WorldOfBlastClaim {
             currentToken.safeTransferFrom(address(this), to, tokenId);
             balance--;
         }
-        
+
         return true;
     }
 }
