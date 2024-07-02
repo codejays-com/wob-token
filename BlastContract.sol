@@ -4,7 +4,6 @@ pragma solidity ^0.8.20;
 import "@openzeppelin/contracts/token/ERC721/IERC721.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
-enum Environment { TESTNET, MAINNET }
 enum YieldMode { AUTOMATIC, VOID, CLAIMABLE }
 enum GasMode { VOID, CLAIMABLE }
 
@@ -64,7 +63,7 @@ contract BlastContract {
     IBlastPoints private blastPointsInstance;
     IBlast private blastInstance;
 
-    constructor() {
+    constructor(uint256 _environment) {
         authorizedToUseContract[msg.sender] = true;
 
         // Blast
@@ -73,9 +72,7 @@ contract BlastContract {
         address USDB_ADDRESS = 0x4200000000000000000000000000000000000022;
         address WETH_ADDDRES = 0x4200000000000000000000000000000000000023;
 
-        Environment _environment = Environment.TESTNET;
-
-        if (_environment == Environment.MAINNET) {
+        if (_environment == 1) { // production
             BLAST_POINTS_ADDRESS = 0x2536FE9ab3F511540F2f9e2eC2A805005C3Dd800;
             USDB_ADDRESS = 0x4300000000000000000000000000000000000003;
             WETH_ADDDRES = 0x4300000000000000000000000000000000000004;
