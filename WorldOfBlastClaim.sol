@@ -31,15 +31,9 @@ contract WorldOfBlastClaim is BlastContract {
     }
 
     function registerTokensToClaim(address to, uint256[] calldata tokenRewards) public onlyAuthorizedContract {
-        uint256 totalTokens = 0;
         for (uint256 rewardIndex = 0; rewardIndex < tokenRewards.length; rewardIndex++) {
             userTokenRewards[to].push(tokenRewards[rewardIndex]);
-            totalTokens += tokenRewards[rewardIndex];
         }
-
-        IERC20 currentToken = IERC20(contractTokenAddress);
-        require(currentToken.allowance(to, address(this)) >= totalTokens, "Insufficient allowance");
-        require(currentToken.transferFrom(to, address(this), totalTokens), "Token transfer failed");
     }
 
     function registerNFTsToClaim(address[] memory to, uint256[] memory nftIds) public onlyAuthorizedContract {
@@ -53,37 +47,31 @@ contract WorldOfBlastClaim is BlastContract {
     function registerTokensToClaimants(address[] calldata to, uint256[][] calldata tokenRewards) public onlyAuthorizedContract {
         require(to.length == tokenRewards.length, "Address and reward arrays must have the same length");
 
-        uint256 totalTokens = 0;
         for (uint256 claimantIndex = 0; claimantIndex < to.length; claimantIndex++) {
             for (uint256 rewardIndex = 0; rewardIndex < tokenRewards[claimantIndex].length; rewardIndex++) {
                 userTokenRewards[to[claimantIndex]].push(tokenRewards[claimantIndex][rewardIndex]);
-                totalTokens += tokenRewards[claimantIndex][rewardIndex];
             }
         }
-
-        IERC20 currentToken = IERC20(contractTokenAddress);
-        require(currentToken.allowance(msg.sender, address(this)) >= totalTokens, "Insufficient allowance");
-        require(currentToken.transferFrom(msg.sender, address(this), totalTokens), "Token transfer failed");
     }
 
     function viewClaimableTokens(address user) view public returns (uint256[] memory) {
-        require(userTokenRewards[user].length > 0, "User has no token rewards");
         return userTokenRewards[user];
     }
 
-    function claimAllTokens(address user) public {
-        require(userTokenRewards[user].length > 0, "User has no token rewards");
+    function claimAllTokens() public {
+        require(userTokenRewards[msg.sender].length > 0, "User has no token rewards");
         IERC20 currentToken = IERC20(contractTokenAddress);
 
         uint256 totalTokens = 0;
-        for (uint256 i = 0; i < userTokenRewards[user].length; i++) {
-            totalTokens += userTokenRewards[user][i];
+        for (uint256 i = 0; i < userTokenRewards[msg.sender].length; i++) {
+            totalTokens += userTokenRewards[msg.sender][i];
         }
 
         require(totalTokens > 0, "No tokens to claim");
-        require(currentToken.transfer(user, totalTokens), "Token transfer failed");
+        require(currentToken.balanceOf(address(this)) > 0, "Not Enough funds in contract");
+        require(currentToken.transfer(msg.sender, totalTokens), "Token transfer failed");
         
-        delete userTokenRewards[user];
+        delete userTokenRewards[msg.sender];
     }
 
     function claimFreeNft() public {
