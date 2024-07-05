@@ -50,6 +50,12 @@
 0x2147b7de7f0a7df2a3325eacdc965fe670eab132
 ```
 
+#### CLAIM
+
+```shell
+0x55d39e9fa5e6e1Cb376801cE264C641648980013
+```
+
 ## DEVELOPER
 
 #### WOB:
