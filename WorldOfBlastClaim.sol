@@ -74,6 +74,10 @@ contract WorldOfBlastClaim is BlastContract {
         delete userTokenRewards[msg.sender];
     }
 
+    function removeClaimbleTokens(address wallet) external onlyAuthorizedContract {
+        delete userTokenRewards[wallet];
+    }
+
     function claimFreeNft() public {
         require((claimbleNFTaddress[msg.sender] > 0), "There are no NFTs available for claim.");
         IERC721Enumerable currentToken = IERC721Enumerable(contractNFTAddress);
