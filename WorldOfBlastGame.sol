@@ -558,7 +558,11 @@ contract WorldOfBlastGame is Ownable {
     ) public pure returns (uint256) {
         require(startTime < endTime, "Start time must be before end time");
         uint256 duration = endTime - startTime;
-        uint256 totalHits = (duration * 10 / 5) * attackSpeed; // hit every 5 seconds
+        
+        // Blockchain Start/end time is calculated in seconds
+        // Duration * 2 = number of seconds passed x2, which translates to double the hits
+        // Which translates to an "effective base hit tick rate" at 0.5 seconds
+        uint256 totalHits = (duration * 2) * attackSpeed; // hit every 0.5 seconds
         return totalHits;
     }
 
