@@ -152,8 +152,6 @@ interface IERC721Enumerable is IERC721, WorldOfBlastNft {
 contract WorldOfBlastDrop {
     address public contractTokenAddress;
     address public contractNFTAddress;
-    uint256 public defaultTokenEarnsPercent = 3381000000000; // 0.00003381 percent
-    uint256 public targetAveragePercent = 98;
 
     mapping(address => bool) public authorizedToUseContract;
 
@@ -163,10 +161,15 @@ contract WorldOfBlastDrop {
     IBlastPoints private blastPointsInstance;
     IBlast private blastInstance;
 
+    uint256 public RATE = 12500000000;
+    uint256[] public weights = [150, 70, 50, 25, 20, 5, 4, 1];
+    uint256[] public multipliers = [40, 50, 75, 90, 100, 200, 1000, 10000];
+    uint256 private totalWeight;
+
     constructor() {
-        contractTokenAddress = 0x0BCAEec9dF553b0E59a0928FCCd9dcf8C0b42601; // WOB TESTNET
-        contractNFTAddress = 0x26dAEBf3CAbd3b63E3869A9D4b2357FaB1943dbd; // NFT TESTNET
-        
+        contractTokenAddress = 0x4200000000000000000000000000000000000023; // WOB TESTNET
+        contractNFTAddress = 0x0B854b221858F4269ae04704a891e12265BBa13C; // NFT TESTNET
+
         authorizedToUseContract[msg.sender] = true;
 
         // Blast
@@ -198,6 +201,10 @@ contract WorldOfBlastDrop {
         blastInstance.configureClaimableYield();
         blastInstance.configureClaimableGas();
         blastInstance.configureGovernor(msg.sender);
+
+        for (uint256 i = 0; i < weights.length; i++) {
+            totalWeight += weights[i];
+        }
     }
 
     modifier onlyAuthorizedContract() {
@@ -208,14 +215,7 @@ contract WorldOfBlastDrop {
         _;
     }
 
-    event TokenDrop(
-        uint256 hit,
-        uint256 totalDamage,
-        uint256 additionalDamage,
-        uint256 earns,
-        uint256 percent,
-        uint256 deliveryEarns
-    );
+    event tokenDrop(address to, uint256 multiplier, uint256 earns);
 
     function authorizeContract(address contractAddress, bool authorized)
         external
@@ -238,72 +238,47 @@ contract WorldOfBlastDrop {
         contractNFTAddress = _contractAddress;
     }
 
-    function setDefaultTokenEarnsPercent(uint256 _defaultTokenEarnsPercent)
-        external
-        onlyAuthorizedContract
-    {
-        defaultTokenEarnsPercent = _defaultTokenEarnsPercent;
+    function updateRate(uint256 _rate) external onlyAuthorizedContract {
+        RATE = _rate;
     }
 
-    function setTargetAveragePercent(uint256 _targetAveragePercent)
-        external
-        onlyAuthorizedContract
-    {
-        targetAveragePercent = _targetAveragePercent;
-    }
-
-    function handleRandomNumber() internal view returns (uint256) {
-        uint256 randomNumber = uint256(
+    function getMultiplier() public view returns (uint256) {
+        uint256 randomValue = uint256(
             keccak256(abi.encodePacked(block.timestamp))
         );
-        if (randomNumber % 100 < targetAveragePercent) {
-            return handleRandomInRange(30, 180);
-        } else {
-            return handleRandomInRange(181, 500);
+        uint256 weightedRandom = randomValue % totalWeight;
+        uint256 cumulativeWeight = 0;
+        for (uint256 i = 0; i < weights.length; i++) {
+            cumulativeWeight += weights[i];
+            if (weightedRandom < cumulativeWeight) {
+                return multipliers[i];
+            }
         }
+
+        revert("No multipliers found.");
     }
 
-    function handleRandomInRange(uint256 min, uint256 max)
-        internal
-        view
+    function handleTokenEarnings(address _address, uint256 damage)
+        external
+        onlyAuthorizedContract
         returns (uint256)
     {
-        uint256 randomNumber = uint256(
-            keccak256(abi.encodePacked(block.timestamp))
-        );
-        return (randomNumber % (max - min + 1)) + min;
-    }
-
-    function handleTokenEarnings(
-        address to,
-        uint256 hit,
-        uint256 damage,
-        uint256 attackSpeed,
-        uint256 durability,
-        uint256 durabilityPerUse
-    ) external onlyAuthorizedContract returns (uint256) {
-        uint256 totalDamage = damage *
-            attackSpeed *
-            (durability / durabilityPerUse);
-        uint256 additionalDamage = totalDamage * defaultTokenEarnsPercent;
-        uint256 earns = additionalDamage * hit;
-        uint256 percent = handleRandomNumber();
-        uint256 deliveryEarns = ((earns * handleRandomNumber()) / 100);
+        uint256 multiplier = getMultiplier();
+        uint256 deliveryEarns = ((RATE * damage * multiplier) / 100);
+        emit tokenDrop(_address, multiplier, deliveryEarns);
 
         IERC20 currentToken = IERC20(contractTokenAddress);
+
         uint256 currentAmount = currentToken.balanceOf(address(this));
+
         if (deliveryEarns > currentAmount) {
             deliveryEarns = currentAmount;
         }
-        currentToken.transfer(to, deliveryEarns);
-        emit TokenDrop(
-            hit,
-            totalDamage,
-            additionalDamage,
-            earns,
-            percent,
-            deliveryEarns
-        );
+
+        if (deliveryEarns > 0) {
+            currentToken.transfer(_address, deliveryEarns);
+        }
+
         return deliveryEarns;
     }
 
@@ -380,7 +355,6 @@ contract WorldOfBlastDrop {
     }
 
     // Blast functions
-
     function configureYieldModeTokens(
         address _usdAddress,
         address _wethAddress,
@@ -604,6 +578,7 @@ contract WorldOfBlastDrop {
     {
         return blastInstance.readYieldConfiguration(contractAddress);
     }
+
 
     function readGasParams(address contractAddress)
         external
