@@ -53,139 +53,10 @@ interface IExtendedERC721 is IERC721 {
     function setStakedStatus(uint256 tokenId, bool status) external;
 }
 
-interface IBlastPoints {
-    function configurePointsOperator(address operator) external;
-
-    function configurePointsOperatorOnBehalf(
-        address contractAddress,
-        address operator
-    ) external;
-}
-
-interface IBlast {
-    // configure
-    function configureContract(
-        address contractAddress,
-        YieldMode _yield,
-        GasMode gasMode,
-        address governor
-    ) external;
-
-    function configure(
-        YieldMode _yield,
-        GasMode gasMode,
-        address governor
-    ) external;
-
-    // base configuration options
-    function configureClaimableYield() external;
-
-    function configureClaimableYieldOnBehalf(address contractAddress) external;
-
-    function configureAutomaticYield() external;
-
-    function configureAutomaticYieldOnBehalf(address contractAddress) external;
-
-    function configureVoidYield() external;
-
-    function configureVoidYieldOnBehalf(address contractAddress) external;
-
-    function configureClaimableGas() external;
-
-    function configureClaimableGasOnBehalf(address contractAddress) external;
-
-    function configureVoidGas() external;
-
-    function configureVoidGasOnBehalf(address contractAddress) external;
-
-    function configureGovernor(address _governor) external;
-
-    function configureGovernorOnBehalf(
-        address _newGovernor,
-        address contractAddress
-    ) external;
-
-    // claim yield
-    function claimYield(
-        address contractAddress,
-        address recipientOfYield,
-        uint256 amount
-    ) external returns (uint256);
-
-    function claimAllYield(address contractAddress, address recipientOfYield)
-        external
-        returns (uint256);
-
-    // claim gas
-    function claimAllGas(address contractAddress, address recipientOfGas)
-        external
-        returns (uint256);
-
-    function claimGasAtMinClaimRate(
-        address contractAddress,
-        address recipientOfGas,
-        uint256 minClaimRateBips
-    ) external returns (uint256);
-
-    function claimMaxGas(address contractAddress, address recipientOfGas)
-        external
-        returns (uint256);
-
-    function claimGas(
-        address contractAddress,
-        address recipientOfGas,
-        uint256 gasToClaim,
-        uint256 gasSecondsToConsume
-    ) external returns (uint256);
-
-    // read functions
-    function readClaimableYield(address contractAddress)
-        external
-        view
-        returns (uint256);
-
-    function readYieldConfiguration(address contractAddress)
-        external
-        view
-        returns (uint8);
-
-    function readGasParams(address contractAddress)
-        external
-        view
-        returns (
-            uint256 etherSeconds,
-            uint256 etherBalance,
-            uint256 lastUpdated,
-            GasMode
-        );
-}
-
-interface IERC20Rebasing {
-    // to reflect the configuration
-    function configure(YieldMode) external returns (uint256);
-
-    // "claimable" yield mode accounts can call this this claim their yield
-    // to another address
-    function claim(address recipient, uint256 amount)
-        external
-        returns (uint256);
-
-    // read the claimable amount for an account
-    function getClaimableAmount(address account)
-        external
-        view
-        returns (uint256);
-}
-
 interface WorldOfBlastDrop {
-    function handleTokenEarnings(
-        address to,
-        uint256 hit,
-        uint256 damage,
-        uint256 attackSpeed,
-        uint256 durability,
-        uint256 durabilityPerUse
-    ) external returns (uint256);
+    function handleTokenEarnings(address to, uint256 total)
+        external
+        returns (uint256);
 
     function handleNFTEarnings(address to) external;
 }
@@ -206,46 +77,24 @@ contract WorldOfBlastGame is Ownable {
         IMonsterContract.Monster monster;
     }
 
+    struct WeaponToken {
+        uint256 damage;
+        uint256 attackSpeed;
+        uint256 durability;
+        uint256 durabilityPerUse;
+    }
+
     address[] public locations;
-    uint256 public huntCount = 1;
+    uint256 public huntCount = 0;
     address public _operator;
-
-    IBlast public constant BLAST =
-        IBlast(0x4300000000000000000000000000000000000002);
-
-    /** BLAST MAINNET
-    address public constant BLAST_POINTS = 0x2536FE9ab3F511540F2f9e2eC2A805005C3Dd800;
-    IERC20Rebasing public constant USDB = IERC20Rebasing(0x4300000000000000000000000000000000000003);
-    IERC20Rebasing public constant WETH = IERC20Rebasing(0x4300000000000000000000000000000000000004);
-    **/
-
-    /*********************** BLAST TESTNET ***********************/
-    address public constant BLAST_POINTS =
-        0x2fc95838c71e76ec69ff817983BFf17c710F34E0;
-
-    IERC20Rebasing public constant USDB =
-        IERC20Rebasing(0x4200000000000000000000000000000000000022);
-
-    IERC20Rebasing public constant WETH =
-        IERC20Rebasing(0x4200000000000000000000000000000000000023);
 
     mapping(address => uint256) public huntStartTimes;
     mapping(address => uint256) public activeHuntId;
 
     mapping(uint256 => Hunt) public hunts;
 
-    modifier onlyOperator() {
-        require(msg.sender == _operator, "Only the operator");
-        _;
-    }
-
-    event OperatorTransferred(
-        address indexed previousOperator,
-        address indexed newOperator
-    );
-
     event HuntHasBegun(
-        uint256 indexed id,
+        uint256 indexed huntId,
         uint256 startTime,
         uint256 weapon,
         address hunter,
@@ -254,7 +103,7 @@ contract WorldOfBlastGame is Ownable {
     );
 
     event HuntEnd(
-        uint256 indexed id,
+        uint256 indexed huntId,
         uint256 startTime,
         uint256 endTime,
         uint256 hitCounter,
@@ -262,203 +111,17 @@ contract WorldOfBlastGame is Ownable {
     );
 
     event updateNFTContract(address _contract);
-
     event updateDropContract(address _contract);
 
-    // handle drop
     address public contractDropAddress;
 
     constructor() Ownable(msg.sender) {
         _operator = msg.sender;
 
-        BLAST.configureAutomaticYield();
-        BLAST.configureClaimableYield();
-        BLAST.configureClaimableGas();
-
-        BLAST.configureGovernor(msg.sender);
-
-        USDB.configure(YieldMode.CLAIMABLE);
-        WETH.configure(YieldMode.CLAIMABLE);
-
-        IBlastPoints(BLAST_POINTS).configurePointsOperator(_operator);
-
-        emit OperatorTransferred(address(0), _operator);
-    }
-
-    /*********************** BLAST START ***********************/
-
-    function configureContract(
-        address contractAddress,
-        YieldMode _yield,
-        GasMode gasMode,
-        address governor
-    ) external onlyOwner {
-        BLAST.configureContract(contractAddress, _yield, gasMode, governor);
-    }
-
-    function configure(
-        YieldMode _yield,
-        GasMode gasMode,
-        address governor
-    ) external onlyOwner {
-        BLAST.configure(_yield, gasMode, governor);
-    }
-
-    function configureClaimableYieldOnBehalf(address contractAddress)
-        external
-        onlyOwner
-    {
-        BLAST.configureClaimableYieldOnBehalf(contractAddress);
-    }
-
-    function configureAutomaticYieldOnBehalf(address contractAddress)
-        external
-        onlyOwner
-    {
-        BLAST.configureAutomaticYieldOnBehalf(contractAddress);
-    }
-
-    function configureVoidYield() external onlyOwner {
-        BLAST.configureVoidYield();
-    }
-
-    function configureVoidYieldOnBehalf(address contractAddress)
-        external
-        onlyOwner
-    {
-        BLAST.configureVoidYieldOnBehalf(contractAddress);
-    }
-
-    function configureVoidGas() external onlyOwner {
-        BLAST.configureVoidGas();
-    }
-
-    function configureVoidGasOnBehalf(address contractAddress)
-        external
-        onlyOwner
-    {
-        BLAST.configureVoidGasOnBehalf(contractAddress);
-    }
-
-    function configureGovernorOnBehalf(address _newGovernor) public onlyOwner {
-        _operator = _newGovernor;
-        BLAST.configureGovernorOnBehalf(_newGovernor, address(this));
-        emit OperatorTransferred(_operator, _newGovernor);
-    }
-
-    function configurePointsOperatorOnBehalf(address newOperator)
-        external
-        onlyOwner
-    {
-        _operator = newOperator;
-        IBlastPoints(_operator).configurePointsOperatorOnBehalf(
-            address(this),
-            newOperator
+        NFTContract = IExtendedERC721(
+            0x0B854b221858F4269ae04704a891e12265BBa13C
         );
     }
-
-    function configureYieldModeTokens(YieldMode _weth, YieldMode _usdb)
-        external
-        onlyOperator
-    {
-        USDB.configure(_usdb);
-        WETH.configure(_weth);
-    }
-
-    function claimYieldTokens(address recipient, uint256 amount)
-        external
-        onlyOperator
-    {
-        USDB.claim(recipient, amount);
-        WETH.claim(recipient, amount);
-    }
-
-    function configureClaimableGasOnBehalf(address contractAddress)
-        external
-        onlyOperator
-    {
-        BLAST.configureClaimableGasOnBehalf(contractAddress);
-    }
-
-    // claim yield
-
-    function claimYield(address recipient, uint256 amount)
-        external
-        onlyOperator
-    {
-        BLAST.claimYield(address(this), recipient, amount);
-    }
-
-    function claimAllYield(address recipient) external onlyOperator {
-        BLAST.claimAllYield(address(this), recipient);
-    }
-
-    // claim gas
-    function claimAllGas(address recipientOfGas)
-        external
-        onlyOperator
-        returns (uint256)
-    {
-        return BLAST.claimAllGas(address(this), recipientOfGas);
-    }
-
-    function claimGasAtMinClaimRate(
-        address recipientOfGas,
-        uint256 minClaimRateBips
-    ) external onlyOperator returns (uint256) {
-        return
-            BLAST.claimGasAtMinClaimRate(
-                address(this),
-                recipientOfGas,
-                minClaimRateBips
-            );
-    }
-
-    function claimMaxGas(address recipientOfGas)
-        external
-        onlyOperator
-        returns (uint256)
-    {
-        return BLAST.claimMaxGas(address(this), recipientOfGas);
-    }
-
-    function claimGas(
-        address recipientOfGas,
-        uint256 gasToClaim,
-        uint256 gasSecondsToConsume
-    ) external onlyOperator returns (uint256) {
-        return
-            BLAST.claimGas(
-                address(this),
-                recipientOfGas,
-                gasToClaim,
-                gasSecondsToConsume
-            );
-    }
-
-    // read functions
-    function readClaimableYield() external view returns (uint256) {
-        return BLAST.readClaimableYield(address(this));
-    }
-
-    function readYieldConfiguration() external view returns (uint8) {
-        return BLAST.readYieldConfiguration(address(this));
-    }
-
-    function readGasParams()
-        external
-        view
-        returns (
-            uint256 etherSeconds,
-            uint256 etherBalance,
-            uint256 lastUpdated,
-            GasMode
-        )
-    {
-        return BLAST.readGasParams(address(this));
-    }
-
-    /*********************** BLAST END  ***********************/
 
     function getActiveHuntDetails(address userAddress)
         public
@@ -557,9 +220,38 @@ contract WorldOfBlastGame is Ownable {
         uint256 endTime
     ) public pure returns (uint256) {
         require(startTime < endTime, "Start time must be before end time");
-        uint256 duration = endTime - startTime;
-        uint256 totalHits = (duration * 10 / 5) * attackSpeed; // hit every 5 seconds
+        uint256 duration = (endTime - startTime);
+        uint256 totalHits = (duration * attackSpeed);
         return totalHits;
+    }
+
+    function getWeaponToken(uint256 huntId)
+        public
+        view
+        returns (WeaponToken memory)
+    {
+        uint256 weaponTokenId = hunts[huntId].weapon;
+
+        (
+            ,
+            ,
+            uint256 damage,
+            uint256 attackSpeed,
+            uint256 durability,
+            uint256 durabilityPerUse,
+            ,
+            ,
+
+        ) = NFTContract.getItemDetails(weaponTokenId);
+
+        WeaponToken memory weaponToken = WeaponToken({
+            damage: damage,
+            attackSpeed: attackSpeed,
+            durability: durability,
+            durabilityPerUse: durabilityPerUse
+        });
+
+        return weaponToken;
     }
 
     function handleCharacterBattle(
@@ -575,17 +267,14 @@ contract WorldOfBlastGame is Ownable {
             endTime
         );
 
-        uint256 hitsBeforeBroke = 0;
-        
-        for (uint256 index = 0; index < totalHitsQuantity; index++) {
-            if (durability <= 0) {
-                durability = 0;
-                break;
-            } else {
-                durability -= durabilityPerUse;
-                hitsBeforeBroke++;
-            }
-        }
+        uint256 maxHitsBeforeBroke = durability / durabilityPerUse;
+
+        uint256 hitsBeforeBroke = totalHitsQuantity > maxHitsBeforeBroke
+            ? maxHitsBeforeBroke
+            : totalHitsQuantity;
+
+        durability -= hitsBeforeBroke * durabilityPerUse;
+
         return (durability, hitsBeforeBroke);
     }
 
@@ -595,25 +284,18 @@ contract WorldOfBlastGame is Ownable {
             "Not the hunter of this hunt"
         );
         require(hunts[huntId].endTime == 0, "Hunt already ended");
+
         hunts[huntId].endTime = block.timestamp;
         huntStartTimes[msg.sender] = 0;
-        (
-            ,
-            ,
-            /* string memory name */
-            /* string memory description */
-            uint256 damage,
-            uint256 attackSpeed,
-            uint256 durability, /* string memory max */
-            uint256 durabilityPerUse, /* string memory weaponType */
-            ,
-            ,
-        ) = /* string memory imageUrl */
-            NFTContract.getItemDetails(hunts[huntId].weapon);
-
         activeHuntId[msg.sender] = 0;
 
-        // handle nft durability
+        WeaponToken memory weaponToken = getWeaponToken(huntId);
+
+        uint256 attackSpeed = weaponToken.attackSpeed;
+        uint256 durability = weaponToken.durability;
+        uint256 durabilityPerUse = weaponToken.durabilityPerUse;
+        uint256 damage = weaponToken.damage;
+
         (uint256 currentDurability, uint256 hitCounter) = handleCharacterBattle(
             attackSpeed,
             durability,
@@ -631,22 +313,15 @@ contract WorldOfBlastGame is Ownable {
         );
 
         NFTContract.updateDurability(hunts[huntId].weapon, currentDurability);
-
         NFTContract.setStakedStatus(hunts[huntId].weapon, false);
 
         WorldOfBlastDrop worldOfBlastDrop = WorldOfBlastDrop(
             contractDropAddress
         );
 
-        worldOfBlastDrop.handleTokenEarnings(
-            msg.sender,
-            hitCounter,
-            damage,
-            attackSpeed,
-            durability,
-            durabilityPerUse
-        );
-
-        worldOfBlastDrop.handleNFTEarnings(msg.sender);
+        uint256 timeSg = (hunts[huntId].endTime - hunts[huntId].startTime);
+        uint256 totalDamage = (timeSg * attackSpeed * damage);
+        worldOfBlastDrop.handleTokenEarnings(msg.sender, totalDamage);
+        
     }
 }
