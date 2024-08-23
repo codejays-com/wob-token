@@ -20,7 +20,8 @@ interface IWorldOfBlastCrafting {
             uint256 durabilityPerUse,
             string memory weaponType,
             string memory imageUrl,
-            uint256 weightProbability
+            uint256 weightProbability,
+            string memory rarity
         );
 
     function drawCraftableItem(uint256 x)
@@ -35,7 +36,8 @@ interface IWorldOfBlastCrafting {
             uint256 durabilityPerUse,
             string memory weaponType,
             string memory imageUrl,
-            uint256 weightProbability
+            uint256 weightProbability,
+            string memory rarity
         );
 }
 
@@ -53,6 +55,7 @@ contract WorldOfBlastNft is ERC721Enumerable, ERC721URIStorage, Ownable {
         string weaponType;
         string imageUrl;
         bool isStaked;
+        string rarity;
     }
 
     IERC20 public WOB;
@@ -176,6 +179,7 @@ contract WorldOfBlastNft is ERC721Enumerable, ERC721URIStorage, Ownable {
     {
         for (uint256 i = 0; i < quantity; i++) {
             uint256 tokenId = tokenIdCounter++;
+
             (
                 string memory name,
                 string memory description,
@@ -185,7 +189,8 @@ contract WorldOfBlastNft is ERC721Enumerable, ERC721URIStorage, Ownable {
                 uint256 durabilityPerUse,
                 string memory weaponType,
                 string memory imageUrl,
-
+                ,
+                string memory rarity
             ) = craftingContract.getCraftableItem(craftableItemId);
             items[tokenId] = Item(
                 name,
@@ -197,7 +202,8 @@ contract WorldOfBlastNft is ERC721Enumerable, ERC721URIStorage, Ownable {
                 durabilityPerUse,
                 weaponType,
                 imageUrl,
-                false
+                false,
+                rarity
             );
             _safeMint(msg.sender, tokenId);
             _setTokenURI(tokenId, imageUrl);
@@ -230,7 +236,8 @@ contract WorldOfBlastNft is ERC721Enumerable, ERC721URIStorage, Ownable {
                 uint256 durabilityPerUse,
                 string memory weaponType,
                 string memory imageUrl,
-
+                ,
+                string memory rarity
             ) = craftingContract.drawCraftableItem(tokenId);
 
             items[tokenId] = Item(
@@ -243,7 +250,8 @@ contract WorldOfBlastNft is ERC721Enumerable, ERC721URIStorage, Ownable {
                 durabilityPerUse,
                 weaponType,
                 imageUrl,
-                false
+                false,
+                rarity
             );
             itemIds[i] = tokenId;
             _safeMint(msg.sender, tokenId);
@@ -339,12 +347,16 @@ contract WorldOfBlastNft is ERC721Enumerable, ERC721URIStorage, Ownable {
                 ", ",
                 '"weaponType": "',
                 items[tokenId].weaponType,
+                '", ',
+                '"rarity": "',
+                items[tokenId].rarity,
                 '"',
                 "}, ",
                 '"external_link": "https://worldofblast.com"'
                 "}"
             )
         );
+
         return string(abi.encodePacked(baseURI, json));
     }
 
@@ -360,7 +372,8 @@ contract WorldOfBlastNft is ERC721Enumerable, ERC721URIStorage, Ownable {
             uint256 durabilityPerUse,
             uint256 maxDurability,
             string memory weaponType,
-            string memory imageUrl
+            string memory imageUrl,
+            string memory rarity
         )
     {
         Item storage item = items[tokenId];
@@ -373,7 +386,8 @@ contract WorldOfBlastNft is ERC721Enumerable, ERC721URIStorage, Ownable {
             item.durabilityPerUse,
             item.maxDurability,
             item.weaponType,
-            item.imageUrl
+            item.imageUrl,
+            item.rarity
         );
     }
 
