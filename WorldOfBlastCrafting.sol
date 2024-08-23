@@ -78,7 +78,8 @@ contract WorldOfBlastCrafting is Ownable {
             uint256 durabilityPerUse,
             string memory weaponType,
             string memory imageUrl,
-            uint256 weightProbability
+            uint256 weightProbability,
+            string memory rarity
         )
     {
         require(items[id].id != 0, "Item ID does not exist");
@@ -92,7 +93,8 @@ contract WorldOfBlastCrafting is Ownable {
             craftableItem.durabilityPerUse,
             craftableItem.weaponType,
             craftableItem.imageUrl,
-            craftableItem.weightProbability
+            craftableItem.weightProbability,
+            craftableItem.rarity
         );
     }
 
@@ -168,7 +170,6 @@ contract WorldOfBlastCrafting is Ownable {
 
     function deleteCraftableItem(uint256 itemId) external onlyOwner {
         require(items[itemId].id != 0, "Item ID does not exist");
-
         delete items[itemId];
         for (uint256 i = 0; i < craftingContract.itemIds.length; i++) {
             if (craftingContract.itemIds[i] == itemId) {
@@ -196,7 +197,8 @@ contract WorldOfBlastCrafting is Ownable {
             uint256 durabilityPerUse,
             string memory weaponType,
             string memory imageUrl,
-            uint256 weightProbability
+            uint256 weightProbability,
+            string memory rarity
         )
     {
         require(craftingContract.totalCraftableItems > 0, "No items available");
@@ -232,7 +234,8 @@ contract WorldOfBlastCrafting is Ownable {
                     selectedItem.durabilityPerUse,
                     selectedItem.weaponType,
                     selectedItem.imageUrl,
-                    selectedItem.weightProbability
+                    selectedItem.weightProbability,
+                    selectedItem.rarity
                 );
             }
         }
