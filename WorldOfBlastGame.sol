@@ -119,7 +119,7 @@ contract WorldOfBlastGame is Ownable {
         _operator = msg.sender;
 
         NFTContract = IExtendedERC721(
-            0x0B854b221858F4269ae04704a891e12265BBa13C
+            0x71081A6C32006dA21b26d9ca0b0d3FC8e95A2F90
         );
     }
 
