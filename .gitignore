@@ -5,6 +5,8 @@ web/*
 /node_modules
 /.pnp
 .pnp.js
+*.deps
+/.deps
 
 # testing
 /coverage
