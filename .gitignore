@@ -6,7 +6,7 @@ web/*
 /.pnp
 .pnp.js
 *.deps
-/.deps
+/.depsg
 
 # testing
 /coverage
