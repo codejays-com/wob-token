@@ -20,6 +20,7 @@ contract WorldOfBlastCrafting is Ownable {
         string weaponType;
         string imageUrl;
         uint256 weightProbability;
+        string rarity;
     }
 
     struct Crafting {
@@ -108,7 +109,8 @@ contract WorldOfBlastCrafting is Ownable {
         uint256 durabilityPerUse,
         string memory weaponType,
         string memory imageUrl,
-        uint256 weightProbability
+        uint256 weightProbability,
+        string memory rarity
     ) external payable {
         if (isCreationRestricted) {
             require(
@@ -116,7 +118,6 @@ contract WorldOfBlastCrafting is Ownable {
                 "Only owner or creator can create items"
             );
         }
-
         nextItemId++;
         Item memory newItem = Item({
             id: nextItemId,
@@ -128,7 +129,8 @@ contract WorldOfBlastCrafting is Ownable {
             durabilityPerUse: durabilityPerUse,
             weaponType: weaponType,
             imageUrl: imageUrl,
-            weightProbability: weightProbability
+            weightProbability: weightProbability,
+            rarity: rarity
         });
         items[nextItemId] = newItem;
         craftingContract.itemIds.push(nextItemId);
@@ -146,7 +148,8 @@ contract WorldOfBlastCrafting is Ownable {
         uint256 durabilityPerUse,
         string memory weaponType,
         string memory imageUrl,
-        uint256 weightProbability
+        uint256 weightProbability,
+        string memory rarity
     ) external onlyCreator {
         require(items[itemId].id != 0, "Item ID does not exist");
         Item storage craftableItem = items[itemId];
@@ -159,6 +162,7 @@ contract WorldOfBlastCrafting is Ownable {
         craftableItem.weaponType = weaponType;
         craftableItem.imageUrl = imageUrl;
         craftableItem.weightProbability = weightProbability;
+        craftableItem.rarity = rarity;
         emit ItemUpdated(itemId, durability);
     }
 
