@@ -214,17 +214,6 @@ contract WorldOfBlastGame is Ownable {
         return huntCount;
     }
 
-    function handleGameTotalHits(
-        uint256 attackSpeed,
-        uint256 startTime,
-        uint256 endTime
-    ) public pure returns (uint256) {
-        require(startTime < endTime, "Start time must be before end time");
-        uint256 duration = (endTime - startTime);
-        uint256 totalHits = (duration * attackSpeed);
-        return totalHits;
-    }
-
     function getWeaponToken(uint256 huntId)
         public
         view
@@ -254,28 +243,37 @@ contract WorldOfBlastGame is Ownable {
         return weaponToken;
     }
 
-    function handleCharacterBattle(
+    // Calculates effective number of hits.
+    function handleCharacterBattleHits(
         uint256 attackSpeed,
         uint256 durability,
         uint256 durabilityPerUse,
         uint256 startTime,
         uint256 endTime
-    ) internal pure returns (uint256, uint256) {
-        uint256 totalHitsQuantity = handleGameTotalHits(
-            attackSpeed,
-            startTime,
-            endTime
-        );
+    ) internal pure returns (uint256) {
+        require(startTime < endTime, "Start time must be before end time");
 
         uint256 maxHitsBeforeBroke = durability / durabilityPerUse;
+        uint256 duration = (endTime - startTime);
+        uint256 totalPotentialHits = (duration * attackSpeed);
 
-        uint256 hitsBeforeBroke = totalHitsQuantity > maxHitsBeforeBroke
+        // Calculate effective hits to reward
+        uint256 totalEffectiveHits = totalPotentialHits > maxHitsBeforeBroke
             ? maxHitsBeforeBroke
-            : totalHitsQuantity;
+            : totalPotentialHits;
 
-        durability -= hitsBeforeBroke * durabilityPerUse;
+        return (totalEffectiveHits);
+    }
 
-        return (durability, hitsBeforeBroke);
+    // Reduces Item durability based on hits.
+    function handleCharacterBattleDurability(
+        uint256 durability,
+        uint256 durabilityPerUse,
+        uint256 totalEffectiveHits
+    ) internal pure returns (uint256) {
+        durability -= totalEffectiveHits * durabilityPerUse;
+
+        return (durability);
     }
 
     function endHunt(uint256 huntId) public {
@@ -296,7 +294,7 @@ contract WorldOfBlastGame is Ownable {
         uint256 durabilityPerUse = weaponToken.durabilityPerUse;
         uint256 damage = weaponToken.damage;
 
-        (uint256 currentDurability, uint256 hitCounter) = handleCharacterBattle(
+        (uint256 effectiveHitCounter) = handleCharacterBattleHits(
             attackSpeed,
             durability,
             durabilityPerUse,
@@ -304,11 +302,19 @@ contract WorldOfBlastGame is Ownable {
             hunts[huntId].endTime
         );
 
+        (uint256 currentDurability) = handleCharacterBattleDurability(
+            durability,
+            durabilityPerUse,
+            effectiveHitCounter
+        );
+               
+        uint256 totalDamage = effectiveHitCounter * damage;
+
         emit HuntEnd(
             huntId,
             hunts[huntId].startTime,
             hunts[huntId].endTime,
-            hitCounter,
+            effectiveHitCounter,
             currentDurability
         );
 
@@ -319,9 +325,6 @@ contract WorldOfBlastGame is Ownable {
             contractDropAddress
         );
 
-        uint256 timeSg = (hunts[huntId].endTime - hunts[huntId].startTime);
-        uint256 totalDamage = (timeSg * attackSpeed * damage);
         worldOfBlastDrop.handleTokenEarnings(msg.sender, totalDamage);
-        
     }
 }
