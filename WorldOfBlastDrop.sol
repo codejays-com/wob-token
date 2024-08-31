@@ -161,10 +161,16 @@ contract WorldOfBlastDrop {
     IBlastPoints private blastPointsInstance;
     IBlast private blastInstance;
 
-    uint256 public RATE = 61520961010;
+    uint256 public RATE = 52092448228;
 
-    uint256[] public weights = [150, 70, 50, 25, 20, 5, 4, 1];
-    uint256[] public multipliers = [40, 50, 75, 90, 100, 200, 1000, 10000];
+    uint256[] public weights = [
+        2000, 2000, 2000, 2000, 2000, 1500, 1000, 950, 900, 800,
+        750, 750, 500, 500, 350, 250, 150, 50, 5, 4, 3, 2
+    ];
+    uint256[] public multipliers = [
+        70, 75, 80, 85, 90, 95, 100, 105, 110, 115,
+        120, 125, 130, 135, 140, 145, 150, 175, 190, 200, 225, 250
+    ];
     uint256 private totalWeight;
 
     constructor() {
