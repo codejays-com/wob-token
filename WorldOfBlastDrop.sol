@@ -261,7 +261,7 @@ function updateMultipliersPosition(uint256 position, uint256 value) external onl
     }
 
 
-    function getMultiplier(uint256 _random) public view returns (uint256) {
+    function getMultiplier(uint256 _random) private view returns (uint256) {
 
         uint256 randomValue = uint256(
             keccak256(abi.encodePacked(block.timestamp, _random,  msg.sender))
