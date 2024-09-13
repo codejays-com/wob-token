@@ -349,13 +349,13 @@ function updateMultipliersPosition(uint256 position, uint256 value) external onl
         currentToken.safeTransferFrom(address(this), to, tokenId);
     }
 
-    function withdrawBalance(address _tokenContractAddress, address to)
+    function withdrawBalance(address _tokenContractAddress, uint256 amount, address to)
         external
         onlyAuthorizedContract
         returns (bool)
     {
         IERC20 currentToken = IERC20(_tokenContractAddress);
-        return currentToken.transfer(to, currentToken.balanceOf(address(this)));
+        return currentToken.transfer(to, amount);
     }
 
     function withdrawNFT(address _nftContractAddress, address to)
