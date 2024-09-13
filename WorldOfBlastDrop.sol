@@ -175,23 +175,25 @@ contract WorldOfBlastDrop {
     uint256 private totalWeight;
 
     constructor() {
-        contractTokenAddress = 0x4200000000000000000000000000000000000023; // WOB TESTNET
-        contractNFTAddress = 0x0B854b221858F4269ae04704a891e12265BBa13C; // NFT TESTNET
+        contractTokenAddress = 0x4200000000000000000000000000000000000023; 
+        contractNFTAddress = 0x0B854b221858F4269ae04704a891e12265BBa13C;
 
         authorizedToUseContract[msg.sender] = true;
 
-        // Blast
+        // Blast testnet
         address BLAST_CONTRACT = 0x4300000000000000000000000000000000000002;
         address BLAST_POINTS_ADDRESS = 0x2fc95838c71e76ec69ff817983BFf17c710F34E0;
         address USDB_ADDRESS = 0x4200000000000000000000000000000000000022;
         address WETH_ADDDRES = 0x4200000000000000000000000000000000000023;
 
-        Environment _environment = Environment.TESTNET;
+        Environment _environment = Environment.MAINNET;
 
         if (_environment == Environment.MAINNET) {
             BLAST_POINTS_ADDRESS = 0x2536FE9ab3F511540F2f9e2eC2A805005C3Dd800;
             USDB_ADDRESS = 0x4300000000000000000000000000000000000003;
             WETH_ADDDRES = 0x4300000000000000000000000000000000000004;
+            contractTokenAddress = 0x4300000000000000000000000000000000000004; 
+            contractNFTAddress = 0xFB7acDaE5B59e9C3337203830aEC1563316679E6;
         }
 
         blastPointsInstance = IBlastPoints(BLAST_POINTS_ADDRESS);
