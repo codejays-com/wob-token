@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.26;
+pragma solidity ^0.8.20;
 
 import "@openzeppelin/contracts/token/ERC721/IERC721.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
@@ -165,12 +165,12 @@ contract WorldOfBlastDrop {
     uint256[] private weights = [
         1500, 2500, 3500, 3500, 2500, 2500, 6500, 1500, 2500, 8000, 
         1500, 1500, 1500, 2500, 1250, 1000, 1000, 600, 500, 300, 
-        80, 40, 30, 25, 10
+        80, 40, 30, 25, 10,0,0,0,0,0,0,0,0
     ];
     uint256[] private multipliers = [
         75, 78, 80, 82, 85, 88, 90, 92, 95, 100, 
         105, 110, 115, 120, 125, 130, 135, 140, 145, 150, 
-        175, 190, 200, 225, 250
+        175, 190, 200, 225, 250,300,500,1000,2000,5000,10000,20000,50000
     ];
     uint256 private totalWeight;
 
@@ -288,7 +288,7 @@ function updateMultipliersPosition(uint256 position, uint256 value) external onl
         uint256 currentAmount = currentToken.balanceOf(address(this));
 
         uint256 totalDamage = RATE * damage;
-        uint256 multiplier = getMultiplier(totalDamage + currentAmount);
+        uint256 multiplier = getMultiplier(totalDamage + currentAmount + 1);
         uint256 deliveryEarns = ((totalDamage * multiplier) / 100);
         emit tokenDrop(_address, multiplier, deliveryEarns);
 
