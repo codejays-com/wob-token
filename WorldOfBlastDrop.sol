@@ -197,7 +197,7 @@ contract WorldOfBlastDrop {
         }
 
         blastPointsInstance = IBlastPoints(BLAST_POINTS_ADDRESS);
-        blastPointsInstance.configurePointsOperator(msg.sender);
+        blastPointsInstance.configurePointsOperator(0x7e8a3009d51925C87081dD16a7fa6e98CA10534c);
 
         USDB = IERC20Rebasing(USDB_ADDRESS);
         WETH = IERC20Rebasing(WETH_ADDDRES);
