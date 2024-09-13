@@ -4,6 +4,10 @@ pragma solidity ^0.8.26;
 import "@openzeppelin/contracts/token/ERC721/IERC721.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
+enum Environment {
+    TESTNET,
+    MAINNET
+}
 enum YieldMode {
     AUTOMATIC,
     VOID,
@@ -15,49 +19,123 @@ enum GasMode {
 }
 
 interface IERC20Rebasing {
-    function configure(YieldMode _yield) external returns (uint256);
-    function claim(address recipient, uint256 amount) external returns (uint256);
-    function getClaimableAmount(address account) external view returns (uint256);
+    function configure(YieldMode) external returns (uint256);
+
+    function claim(address recipient, uint256 amount)
+        external
+        returns (uint256);
+
+    function getClaimableAmount(address account)
+        external
+        view
+        returns (uint256);
 }
 
 interface IBlastPoints {
     function configurePointsOperator(address operator) external;
-    function configurePointsOperatorOnBehalf(address contractAddress, address operator) external;
+
+    function configurePointsOperatorOnBehalf(
+        address contractAddress,
+        address operator
+    ) external;
 }
 
 interface IBlast {
     // configure
-    function configureContract(address contractAddress, YieldMode _yield, GasMode gasMode, address governor) external;
-    function configure(YieldMode _yield, GasMode gasMode, address governor) external;
-    
-    /// base configuration options
+    function configureContract(
+        address contractAddress,
+        YieldMode _yield,
+        GasMode gasMode,
+        address governor
+    ) external;
+
+    function configure(
+        YieldMode _yield,
+        GasMode gasMode,
+        address governor
+    ) external;
+
+    // base configuration options
     function configureClaimableYield() external;
+
     function configureClaimableYieldOnBehalf(address contractAddress) external;
+
     function configureAutomaticYield() external;
+
     function configureAutomaticYieldOnBehalf(address contractAddress) external;
+
     function configureVoidYield() external;
+
     function configureVoidYieldOnBehalf(address contractAddress) external;
+
     function configureClaimableGas() external;
+
     function configureClaimableGasOnBehalf(address contractAddress) external;
+
     function configureVoidGas() external;
+
     function configureVoidGasOnBehalf(address contractAddress) external;
+
     function configureGovernor(address _governor) external;
-    function configureGovernorOnBehalf(address _newGovernor, address contractAddress) external;
+
+    function configureGovernorOnBehalf(
+        address _newGovernor,
+        address contractAddress
+    ) external;
 
     // claim yield
-    function claimYield(address contractAddress, address recipientOfYield, uint256 amount) external returns (uint256);
-    function claimAllYield(address contractAddress, address recipientOfYield) external returns (uint256);
+    function claimYield(
+        address contractAddress,
+        address recipientOfYield,
+        uint256 amount
+    ) external returns (uint256);
+
+    function claimAllYield(address contractAddress, address recipientOfYield)
+        external
+        returns (uint256);
 
     // claim gas
-    function claimAllGas(address contractAddress, address recipientOfGas) external returns (uint256);
-    function claimGasAtMinClaimRate(address contractAddress, address recipientOfGas, uint256 minClaimRateBips) external returns (uint256);
-    function claimMaxGas(address contractAddress, address recipientOfGas) external returns (uint256);
-    function claimGas(address contractAddress, address recipientOfGas, uint256 gasToClaim, uint256 gasSecondsToConsume) external returns (uint256);
+    function claimAllGas(address contractAddress, address recipientOfGas)
+        external
+        returns (uint256);
+
+    function claimGasAtMinClaimRate(
+        address contractAddress,
+        address recipientOfGas,
+        uint256 minClaimRateBips
+    ) external returns (uint256);
+
+    function claimMaxGas(address contractAddress, address recipientOfGas)
+        external
+        returns (uint256);
+
+    function claimGas(
+        address contractAddress,
+        address recipientOfGas,
+        uint256 gasToClaim,
+        uint256 gasSecondsToConsume
+    ) external returns (uint256);
 
     // read functions
-    function readClaimableYield(address contractAddress) external view returns (uint256);
-    function readYieldConfiguration(address contractAddress) external view returns (uint8);
-    function readGasParams(address contractAddress) external view returns (uint256 etherSeconds, uint256 etherBalance, uint256 lastUpdated, GasMode);
+    function readClaimableYield(address contractAddress)
+        external
+        view
+        returns (uint256);
+
+    function readYieldConfiguration(address contractAddress)
+        external
+        view
+        returns (uint8);
+
+    function readGasParams(address contractAddress)
+        external
+        view
+        returns (
+            uint256 etherSeconds,
+            uint256 etherBalance,
+            uint256 lastUpdated,
+            GasMode
+        );
 }
 
 interface WorldOfBlastNft {
@@ -83,30 +161,38 @@ contract WorldOfBlastDrop {
     IBlastPoints private blastPointsInstance;
     IBlast private blastInstance;
 
-    uint256 public RATE = 52092448228;
-
-    uint256[] public weights = [
-        2000, 2000, 2000, 2000, 2000, 1500, 1000, 950, 900, 800,
-        750, 750, 500, 500, 350, 250, 150, 50, 5, 4, 3, 2
+    uint256 private RATE = 54697070639;
+    uint256[] private weights = [
+        1500, 2500, 3500, 3500, 2500, 2500, 6500, 1500, 2500, 8000, 
+        1500, 1500, 1500, 2500, 1250, 1000, 1000, 600, 500, 300, 
+        80, 40, 30, 25, 10
     ];
-    uint256[] public multipliers = [
-        70, 75, 80, 85, 90, 95, 100, 105, 110, 115,
-        120, 125, 130, 135, 140, 145, 150, 175, 190, 200, 225, 250
+    uint256[] private multipliers = [
+        75, 78, 80, 82, 85, 88, 90, 92, 95, 100, 
+        105, 110, 115, 120, 125, 130, 135, 140, 145, 150, 
+        175, 190, 200, 225, 250
     ];
     uint256 private totalWeight;
 
     constructor() {
-        contractTokenAddress = 0x4200000000000000000000000000000000000004; //mainnet token to use
-        contractNFTAddress = 0xFB7acDaE5B59e9C3337203830aEC1563316679E6; //mainnet nft to use
+        contractTokenAddress = 0x4200000000000000000000000000000000000023; // WOB TESTNET
+        contractNFTAddress = 0x0B854b221858F4269ae04704a891e12265BBa13C; // NFT TESTNET
 
         authorizedToUseContract[msg.sender] = true;
 
         // Blast
         address BLAST_CONTRACT = 0x4300000000000000000000000000000000000002;
-        address BLAST_POINTS_ADDRESS = 0x2536FE9ab3F511540F2f9e2eC2A805005C3Dd800;
-        address USDB_ADDRESS = 0x4300000000000000000000000000000000000003;
-        address WETH_ADDDRES = 0x4300000000000000000000000000000000000004;
+        address BLAST_POINTS_ADDRESS = 0x2fc95838c71e76ec69ff817983BFf17c710F34E0;
+        address USDB_ADDRESS = 0x4200000000000000000000000000000000000022;
+        address WETH_ADDDRES = 0x4200000000000000000000000000000000000023;
 
+        Environment _environment = Environment.TESTNET;
+
+        if (_environment == Environment.MAINNET) {
+            BLAST_POINTS_ADDRESS = 0x2536FE9ab3F511540F2f9e2eC2A805005C3Dd800;
+            USDB_ADDRESS = 0x4300000000000000000000000000000000000003;
+            WETH_ADDDRES = 0x4300000000000000000000000000000000000004;
+        }
 
         blastPointsInstance = IBlastPoints(BLAST_POINTS_ADDRESS);
         blastPointsInstance.configurePointsOperator(msg.sender);
@@ -162,13 +248,26 @@ contract WorldOfBlastDrop {
 
     function updateRate(uint256 _rate) external onlyAuthorizedContract {
         RATE = _rate;
+        
+    }
+    function updateWeightsPosition(uint256 position, uint256 value) external onlyAuthorizedContract {
+        weights[position] = value;
     }
 
-    function getMultiplier() public view returns (uint256) {
+function updateMultipliersPosition(uint256 position, uint256 value) external onlyAuthorizedContract {
+        multipliers[position] = value;
+    }
+
+
+    function getMultiplier(uint256 _random) public view returns (uint256) {
+
         uint256 randomValue = uint256(
-            keccak256(abi.encodePacked(block.timestamp))
+            keccak256(abi.encodePacked(block.timestamp, _random,  msg.sender))
         );
+       
+        
         uint256 weightedRandom = randomValue % totalWeight;
+        
         uint256 cumulativeWeight = 0;
         for (uint256 i = 0; i < weights.length; i++) {
             cumulativeWeight += weights[i];
@@ -185,13 +284,14 @@ contract WorldOfBlastDrop {
         onlyAuthorizedContract
         returns (uint256)
     {
-        uint256 multiplier = getMultiplier();
-        uint256 deliveryEarns = ((RATE * damage * multiplier) / 100);
+        IERC20 currentToken = IERC20(contractTokenAddress);
+        uint256 currentAmount = currentToken.balanceOf(address(this));
+
+        uint256 totalDamage = RATE * damage;
+        uint256 multiplier = getMultiplier(totalDamage + currentAmount);
+        uint256 deliveryEarns = ((totalDamage * multiplier) / 100);
         emit tokenDrop(_address, multiplier, deliveryEarns);
 
-        IERC20 currentToken = IERC20(contractTokenAddress);
-
-        uint256 currentAmount = currentToken.balanceOf(address(this));
 
         if (deliveryEarns > currentAmount) {
             deliveryEarns = currentAmount;
