@@ -4,10 +4,6 @@ import "@openzeppelin/contracts/token/ERC721/IERC721.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 
-enum Environment {
-    TESTNET,
-    MAINNET
-}
 enum YieldMode {
     AUTOMATIC,
     VOID,
@@ -153,14 +149,13 @@ contract WorldOfBlastDrop is Ownable {
     mapping(address => bool) public authorizedToUseContract;
 
     // Blast
-    IBlast public constant BLAST =
-        IBlast(0x4300000000000000000000000000000000000002);
+    IBlast constant BLAST = IBlast(0x4300000000000000000000000000000000000002);
 
     IERC20Rebasing public USDB;
     IERC20Rebasing public WETH;
 
-    address public USDB_ADDRESS = 0x4200000000000000000000000000000000000022;
-    address public WETH_ADDDRES = 0x4200000000000000000000000000000000000023;
+    address public USDB_ADDRESS = 0x4300000000000000000000000000000000000003;
+    address public WETH_ADDDRES = 0x4300000000000000000000000000000000000004;
     address public CONTRACT_NFT = 0xFB7acDaE5B59e9C3337203830aEC1563316679E6;
 
     uint256 private RATE = 54697070639;
@@ -238,13 +233,6 @@ contract WorldOfBlastDrop is Ownable {
 
     constructor() Ownable(msg.sender) {
         authorizedToUseContract[msg.sender] = true;
-
-        Environment _environment = Environment.MAINNET;
-
-        if (_environment == Environment.MAINNET) {
-            USDB_ADDRESS = 0x4300000000000000000000000000000000000003;
-            WETH_ADDDRES = 0x4300000000000000000000000000000000000004;
-        }
 
         IBlastPoints(0x2536FE9ab3F511540F2f9e2eC2A805005C3Dd800)
             .configurePointsOperator(
@@ -503,18 +491,11 @@ contract WorldOfBlastDrop is Ownable {
         external
         onlyAuthorizedContract
     {
-        IBlast(0x4300000000000000000000000000000000000002).claimYield(
-            address(this),
-            recipient,
-            amount
-        );
+        BLAST.claimYield(address(this), recipient, amount);
     }
 
     function claimAllYield(address recipient) external onlyAuthorizedContract {
-        IBlast(0x4300000000000000000000000000000000000002).claimAllYield(
-            address(this),
-            recipient
-        );
+        BLAST.claimAllYield(address(this), recipient);
     }
 
     function claimGasAtMinClaimRate(
