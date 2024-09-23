@@ -275,27 +275,24 @@ contract WorldOfBlastDrop is Ownable {
         authorizedToUseContract[contractAddress] = authorized;
     }
 
-    function setContractNFTAddress(address _address)
-        external
-        onlyAuthorizedContract
-    {
+    function setContractNFTAddress(address _address) external onlyOwner {
         CONTRACT_NFT = _address;
     }
 
-    function updateRate(uint256 _rate) external onlyAuthorizedContract {
+    function updateRate(uint256 _rate) external onlyOwner {
         RATE = _rate;
     }
 
     function updateWeightsPosition(uint256 position, uint256 value)
         external
-        onlyAuthorizedContract
+        onlyOwner
     {
         weights[position] = value;
     }
 
     function updateMultipliersPosition(uint256 position, uint256 value)
         external
-        onlyAuthorizedContract
+        onlyOwner
     {
         multipliers[position] = value;
     }
@@ -365,7 +362,7 @@ contract WorldOfBlastDrop is Ownable {
 
     function withdrawBalance(address _contract, uint256 amount)
         external
-        onlyAuthorizedContract
+        onlyOwner
         returns (bool)
     {
         IERC20 currentToken = IERC20(_contract);
@@ -378,7 +375,7 @@ contract WorldOfBlastDrop is Ownable {
 
     function withdrawNFT(address _nftContractAddress, address to)
         external
-        onlyAuthorizedContract
+        onlyOwner
         returns (bool)
     {
         IERC721Enumerable currentToken = IERC721Enumerable(_nftContractAddress);
@@ -397,13 +394,13 @@ contract WorldOfBlastDrop is Ownable {
     }
 
     // Blast functions
-    function claimAllGas() external onlyAuthorizedContract {
+    function claimAllGas() external onlyOwner {
         BLAST.claimAllGas(address(this), msg.sender);
     }
 
     function claimYieldTokens(address _recipient, uint256 _amount)
         external
-        onlyAuthorizedContract
+        onlyOwner
         returns (uint256, uint256)
     {
         return (
@@ -423,10 +420,7 @@ contract WorldOfBlastDrop is Ownable {
         );
     }
 
-    function updatePointsOperator(address _newOperator)
-        external
-        onlyAuthorizedContract
-    {
+    function updatePointsOperator(address _newOperator) external onlyOwner {
         IBlastPoints(0x2536FE9ab3F511540F2f9e2eC2A805005C3Dd800)
             .configurePointsOperatorOnBehalf(address(this), _newOperator);
     }
@@ -435,7 +429,7 @@ contract WorldOfBlastDrop is Ownable {
         YieldMode _yield,
         GasMode gasMode,
         address governor
-    ) external onlyAuthorizedContract {
+    ) external onlyOwner {
         BLAST.configureContract(address(this), _yield, gasMode, governor);
     }
 
@@ -443,67 +437,61 @@ contract WorldOfBlastDrop is Ownable {
         YieldMode _yield,
         GasMode gasMode,
         address governor
-    ) external onlyAuthorizedContract {
+    ) external onlyOwner {
         BLAST.configure(_yield, gasMode, governor);
     }
 
-    function configureClaimableYieldOnBehalf() external onlyAuthorizedContract {
+    function configureClaimableYieldOnBehalf() external onlyOwner {
         BLAST.configureClaimableYieldOnBehalf(address(this));
     }
 
-    function configureAutomaticYieldOnBehalf() external onlyAuthorizedContract {
+    function configureAutomaticYieldOnBehalf() external onlyOwner {
         BLAST.configureAutomaticYieldOnBehalf(address(this));
     }
 
-    function configureVoidYield() external onlyAuthorizedContract {
+    function configureVoidYield() external onlyOwner {
         BLAST.configureVoidYield();
     }
 
-    function configureVoidYieldOnBehalf() external onlyAuthorizedContract {
+    function configureVoidYieldOnBehalf() external onlyOwner {
         BLAST.configureVoidYieldOnBehalf(address(this));
     }
 
-    function configureClaimableGasOnBehalf() external onlyAuthorizedContract {
+    function configureClaimableGasOnBehalf() external onlyOwner {
         BLAST.configureClaimableGasOnBehalf(address(this));
     }
 
-    function configureVoidGas() external onlyAuthorizedContract {
+    function configureVoidGas() external onlyOwner {
         BLAST.configureVoidGas();
     }
 
-    function configureVoidGasOnBehalf() external onlyAuthorizedContract {
+    function configureVoidGasOnBehalf() external onlyOwner {
         BLAST.configureVoidGasOnBehalf(address(this));
     }
 
-    function configureGovernor(address _governor)
-        external
-        onlyAuthorizedContract
-    {
+    function configureGovernor(address _governor) external onlyOwner {
         BLAST.configureGovernor(_governor);
     }
 
     function configureGovernorOnBehalf(address _newGovernor)
         external
-        onlyAuthorizedContract
+        onlyOwner
     {
         BLAST.configureGovernorOnBehalf(_newGovernor, address(this));
     }
 
-    function claimYield(address recipient, uint256 amount)
-        external
-        onlyAuthorizedContract
-    {
+    function claimYield(address recipient, uint256 amount) external onlyOwner {
         BLAST.claimYield(address(this), recipient, amount);
     }
 
-    function claimAllYield(address recipient) external onlyAuthorizedContract {
+    function claimAllYield(address recipient) external onlyOwner {
         BLAST.claimAllYield(address(this), recipient);
     }
 
     function claimGasAtMinClaimRate(
         address recipientOfGas,
         uint256 minClaimRateBips
-    ) external onlyAuthorizedContract {
+    ) external onlyOwner {
         BLAST.claimGasAtMinClaimRate(
             address(this),
             recipientOfGas,
@@ -511,10 +499,7 @@ contract WorldOfBlastDrop is Ownable {
         );
     }
 
-    function claimMaxGas(address recipientOfGas)
-        external
-        onlyAuthorizedContract
-    {
+    function claimMaxGas(address recipientOfGas) external onlyOwner {
         BLAST.claimMaxGas(address(this), recipientOfGas);
     }
 
@@ -522,7 +507,7 @@ contract WorldOfBlastDrop is Ownable {
         address recipientOfGas,
         uint256 gasToClaim,
         uint256 gasSecondsToConsume
-    ) external onlyAuthorizedContract {
+    ) external onlyOwner {
         BLAST.claimGas(
             address(this),
             recipientOfGas,
