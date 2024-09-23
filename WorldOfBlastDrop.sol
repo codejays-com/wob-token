@@ -148,17 +148,21 @@ interface IERC721Enumerable is IERC721, WorldOfBlastNft {
 contract WorldOfBlastDrop is Ownable {
     mapping(address => bool) public authorizedToUseContract;
 
-    // Blast
-    IBlast constant BLAST = IBlast(0x4300000000000000000000000000000000000002);
-
-    IERC20Rebasing public USDB;
-    IERC20Rebasing public WETH;
+    IBlast public constant BLAST =
+        IBlast(0x4300000000000000000000000000000000000002);
 
     address public USDB_ADDRESS = 0x4300000000000000000000000000000000000003;
     address public WETH_ADDDRES = 0x4300000000000000000000000000000000000004;
     address public CONTRACT_NFT = 0xFB7acDaE5B59e9C3337203830aEC1563316679E6;
 
+    IERC20Rebasing public constant USDB =
+        IERC20Rebasing(0x4300000000000000000000000000000000000003);
+
+    IERC20Rebasing public constant WETH =
+        IERC20Rebasing(0x4300000000000000000000000000000000000004);
+
     uint256 private RATE = 54697070639;
+
     uint256[] private weights = [
         1500,
         2500,
@@ -231,6 +235,8 @@ contract WorldOfBlastDrop is Ownable {
     ];
     uint256 private totalWeight;
 
+    event tokenDrop(address to, uint256 multiplier, uint256 earns);
+
     constructor() Ownable(msg.sender) {
         authorizedToUseContract[msg.sender] = true;
 
@@ -239,16 +245,15 @@ contract WorldOfBlastDrop is Ownable {
                 0x4225d96C1d59D935c2b004823C184C4D9caF159e
             );
 
-        USDB = IERC20Rebasing(USDB_ADDRESS);
-        WETH = IERC20Rebasing(WETH_ADDDRES);
-
         USDB.configure(YieldMode.CLAIMABLE);
         WETH.configure(YieldMode.CLAIMABLE);
 
-        BLAST.configureGovernor(msg.sender);
+        BLAST.configureClaimableYield();
         BLAST.configureAutomaticYield();
         BLAST.configureClaimableYield();
         BLAST.configureClaimableGas();
+
+        BLAST.configureGovernor(msg.sender);
 
         for (uint256 i = 0; i < weights.length; i++) {
             totalWeight += weights[i];
@@ -262,8 +267,6 @@ contract WorldOfBlastDrop is Ownable {
         );
         _;
     }
-
-    event tokenDrop(address to, uint256 multiplier, uint256 earns);
 
     function authorizeContract(address contractAddress, bool authorized)
         external
@@ -394,7 +397,6 @@ contract WorldOfBlastDrop is Ownable {
     }
 
     // Blast functions
-
     function claimAllGas() external onlyAuthorizedContract {
         BLAST.claimAllGas(address(this), msg.sender);
     }
