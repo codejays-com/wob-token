@@ -245,152 +245,15 @@ contract WorldOfBlastDrop is Ownable {
                 0x4225d96C1d59D935c2b004823C184C4D9caF159e
             );
 
-        USDB.configure(YieldMode.CLAIMABLE);
-        WETH.configure(YieldMode.CLAIMABLE);
-
-        BLAST.configureClaimableYield();
-        BLAST.configureAutomaticYield();
         BLAST.configureClaimableYield();
         BLAST.configureClaimableGas();
 
-        BLAST.configureGovernor(msg.sender);
+        USDB.configure(YieldMode.CLAIMABLE);
+        WETH.configure(YieldMode.CLAIMABLE);
 
         for (uint256 i = 0; i < weights.length; i++) {
             totalWeight += weights[i];
         }
-    }
-
-    modifier onlyAuthorizedContract() {
-        require(
-            authorizedToUseContract[msg.sender],
-            "Not authorized to use this contract"
-        );
-        _;
-    }
-
-    function authorizeContract(address contractAddress, bool authorized)
-        external
-        onlyAuthorizedContract
-    {
-        authorizedToUseContract[contractAddress] = authorized;
-    }
-
-    function setContractNFTAddress(address _address) external onlyOwner {
-        CONTRACT_NFT = _address;
-    }
-
-    function updateRate(uint256 _rate) external onlyOwner {
-        RATE = _rate;
-    }
-
-    function updateWeightsPosition(uint256 position, uint256 value)
-        external
-        onlyOwner
-    {
-        weights[position] = value;
-    }
-
-    function updateMultipliersPosition(uint256 position, uint256 value)
-        external
-        onlyOwner
-    {
-        multipliers[position] = value;
-    }
-
-    function getMultiplier(uint256 _random) private view returns (uint256) {
-        uint256 randomValue = uint256(
-            keccak256(abi.encodePacked(block.timestamp, _random, msg.sender))
-        );
-
-        uint256 weightedRandom = randomValue % totalWeight;
-        uint256 cumulativeWeight = 0;
-        for (uint256 i = 0; i < weights.length; i++) {
-            cumulativeWeight += weights[i];
-            if (weightedRandom < cumulativeWeight) {
-                return multipliers[i];
-            }
-        }
-
-        revert("No multipliers found.");
-    }
-
-    function handleTokenEarnings(address _address, uint256 damage)
-        external
-        onlyAuthorizedContract
-        returns (uint256)
-    {
-        IERC20 currentToken = IERC20(WETH_ADDDRES);
-
-        uint256 currentAmount = currentToken.balanceOf(address(this));
-
-        uint256 totalDamage = RATE * damage;
-        uint256 multiplier = getMultiplier(totalDamage + currentAmount + 1);
-        uint256 deliveryEarns = ((totalDamage * multiplier) / 100);
-        emit tokenDrop(_address, multiplier, deliveryEarns);
-
-        if (deliveryEarns > currentAmount) {
-            deliveryEarns = currentAmount;
-        }
-
-        if (deliveryEarns > 0) {
-            currentToken.transfer(_address, deliveryEarns);
-        }
-
-        return deliveryEarns;
-    }
-
-    function handleNFTEarnings(address to) external onlyAuthorizedContract {
-        IERC721Enumerable currentToken = IERC721Enumerable(CONTRACT_NFT);
-        uint256 randomNumber = uint256(
-            keccak256(abi.encodePacked(block.timestamp))
-        );
-        uint256 randomInRange = randomNumber % 100;
-        uint256 balance = currentToken.balanceOf(address(this));
-        if (balance > 0 && randomInRange == 0) {
-            uint256 randomIndex = uint256(
-                keccak256(abi.encodePacked(block.timestamp, to))
-            ) % balance;
-            uint256 tokenId = currentToken.tokenOfOwnerByIndex(
-                address(this),
-                randomIndex
-            );
-            WorldOfBlastNft worldOfBlastNft = WorldOfBlastNft(CONTRACT_NFT);
-            worldOfBlastNft.restoreNFT(tokenId);
-            currentToken.safeTransferFrom(address(this), to, tokenId);
-        }
-    }
-
-    function withdrawBalance(address _contract, uint256 amount)
-        external
-        onlyOwner
-        returns (bool)
-    {
-        IERC20 currentToken = IERC20(_contract);
-        return
-            currentToken.transfer(
-                0x875b9a0C81c505b3f06D0669ac7ba4798aC8Ef09,
-                amount
-            );
-    }
-
-    function withdrawNFT(address _nftContractAddress, address to)
-        external
-        onlyOwner
-        returns (bool)
-    {
-        IERC721Enumerable currentToken = IERC721Enumerable(_nftContractAddress);
-        uint256 balance = currentToken.balanceOf(address(this));
-
-        while (balance > 0) {
-            uint256 tokenId = currentToken.tokenOfOwnerByIndex(
-                address(this),
-                balance - 1
-            );
-            currentToken.safeTransferFrom(address(this), to, tokenId);
-            balance--;
-        }
-
-        return true;
     }
 
     // Blast functions
@@ -425,22 +288,6 @@ contract WorldOfBlastDrop is Ownable {
             .configurePointsOperatorOnBehalf(address(this), _newOperator);
     }
 
-    function configureContract(
-        YieldMode _yield,
-        GasMode gasMode,
-        address governor
-    ) external onlyOwner {
-        BLAST.configureContract(address(this), _yield, gasMode, governor);
-    }
-
-    function configure(
-        YieldMode _yield,
-        GasMode gasMode,
-        address governor
-    ) external onlyOwner {
-        BLAST.configure(_yield, gasMode, governor);
-    }
-
     function configureClaimableYieldOnBehalf() external onlyOwner {
         BLAST.configureClaimableYieldOnBehalf(address(this));
     }
@@ -467,17 +314,6 @@ contract WorldOfBlastDrop is Ownable {
 
     function configureVoidGasOnBehalf() external onlyOwner {
         BLAST.configureVoidGasOnBehalf(address(this));
-    }
-
-    function configureGovernor(address _governor) external onlyOwner {
-        BLAST.configureGovernor(_governor);
-    }
-
-    function configureGovernorOnBehalf(address _newGovernor)
-        external
-        onlyOwner
-    {
-        BLAST.configureGovernorOnBehalf(_newGovernor, address(this));
     }
 
     function claimYield(address recipient, uint256 amount) external onlyOwner {
