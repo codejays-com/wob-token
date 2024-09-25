@@ -1,539 +1,274 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.27;
-import "@openzeppelin/contracts/token/ERC721/IERC721.sol";
-import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+pragma solidity ^0.8.0;
 import "@openzeppelin/contracts/access/Ownable.sol";
+import "@openzeppelin/contracts/utils/math/SafeMath.sol";
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
-enum YieldMode {
-    AUTOMATIC,
-    VOID,
-    CLAIMABLE
-}
-enum GasMode {
-    VOID,
-    CLAIMABLE
-}
+contract WorldOfBlastCrafting is Ownable {
+    using SafeMath for uint256;
+    using SafeERC20 for IERC20;
 
-interface IERC20Rebasing {
-    function configure(YieldMode _mode) external returns (uint256);
-
-    function claim(address recipient, uint256 amount)
-        external
-        returns (uint256);
-
-    function getClaimableAmount(address account)
-        external
-        view
-        returns (uint256);
-}
-
-interface IBlastPoints {
-    function configurePointsOperator(address operator) external;
-
-    function configurePointsOperatorOnBehalf(
-        address contractAddress,
-        address operator
-    ) external;
-}
-
-interface IBlast {
-    // configure
-    function configureContract(
-        address contractAddress,
-        YieldMode _yield,
-        GasMode gasMode,
-        address governor
-    ) external;
-
-    function configure(
-        YieldMode _yield,
-        GasMode gasMode,
-        address governor
-    ) external;
-
-    // base configuration options
-    function configureClaimableYield() external;
-
-    function configureClaimableYieldOnBehalf(address contractAddress) external;
-
-    function configureAutomaticYield() external;
-
-    function configureAutomaticYieldOnBehalf(address contractAddress) external;
-
-    function configureVoidYield() external;
-
-    function configureVoidYieldOnBehalf(address contractAddress) external;
-
-    function configureClaimableGas() external;
-
-    function configureClaimableGasOnBehalf(address contractAddress) external;
-
-    function configureVoidGas() external;
-
-    function configureVoidGasOnBehalf(address contractAddress) external;
-
-    function configureGovernor(address _governor) external;
-
-    function configureGovernorOnBehalf(
-        address _newGovernor,
-        address contractAddress
-    ) external;
-
-    // claim yield
-    function claimYield(
-        address contractAddress,
-        address recipientOfYield,
-        uint256 amount
-    ) external returns (uint256);
-
-    function claimAllYield(address contractAddress, address recipientOfYield)
-        external
-        returns (uint256);
-
-    // claim gas
-    function claimAllGas(address contractAddress, address recipientOfGas)
-        external
-        returns (uint256);
-
-    function claimGasAtMinClaimRate(
-        address contractAddress,
-        address recipientOfGas,
-        uint256 minClaimRateBips
-    ) external returns (uint256);
-
-    function claimMaxGas(address contractAddress, address recipientOfGas)
-        external
-        returns (uint256);
-
-    function claimGas(
-        address contractAddress,
-        address recipientOfGas,
-        uint256 gasToClaim,
-        uint256 gasSecondsToConsume
-    ) external returns (uint256);
-
-    // read functions
-    function readClaimableYield(address contractAddress)
-        external
-        view
-        returns (uint256);
-
-    function readYieldConfiguration(address contractAddress)
-        external
-        view
-        returns (uint8);
-
-    function readGasParams(address contractAddress)
-        external
-        view
-        returns (
-            uint256 etherSeconds,
-            uint256 etherBalance,
-            uint256 lastUpdated,
-            GasMode
-        );
-}
-
-interface WorldOfBlastNft {
-    function restoreNFT(uint256 tokenId) external;
-}
-
-interface IERC721Enumerable is IERC721, WorldOfBlastNft {
-    function tokenOfOwnerByIndex(address owner, uint256 index)
-        external
-        view
-        returns (uint256);
-}
-
-contract WorldOfBlastDrop is Ownable {
-    mapping(address => bool) public authorizedToUseContract;
-
-    IBlast public constant BLAST =
-        IBlast(0x4300000000000000000000000000000000000002);
-
-    address public USDB_ADDRESS = 0x4300000000000000000000000000000000000003;
-    address public WETH_ADDDRES = 0x4300000000000000000000000000000000000004;
-    address public CONTRACT_NFT = 0xFB7acDaE5B59e9C3337203830aEC1563316679E6;
-
-    IERC20Rebasing public constant USDB =
-        IERC20Rebasing(0x4300000000000000000000000000000000000003);
-
-    IERC20Rebasing public constant WETH =
-        IERC20Rebasing(0x4300000000000000000000000000000000000004);
-
-    uint256 private RATE = 54697070639;
-
-    uint256[] private weights = [
-        1500,
-        2500,
-        3500,
-        3500,
-        2500,
-        2500,
-        6500,
-        1500,
-        2500,
-        8000,
-        1500,
-        1500,
-        1500,
-        2500,
-        1250,
-        1000,
-        1000,
-        600,
-        500,
-        300,
-        80,
-        40,
-        30,
-        25,
-        10,
-        0,
-        0,
-        0,
-        0,
-        0,
-        0,
-        0,
-        0
-    ];
-    uint256[] private multipliers = [
-        75,
-        78,
-        80,
-        82,
-        85,
-        88,
-        90,
-        92,
-        95,
-        100,
-        105,
-        110,
-        115,
-        120,
-        125,
-        130,
-        135,
-        140,
-        145,
-        150,
-        175,
-        190,
-        200,
-        225,
-        250,
-        300,
-        500,
-        1000,
-        2000,
-        5000,
-        10000,
-        20000,
-        50000
-    ];
-    uint256 private totalWeight;
-
-    event tokenDrop(address to, uint256 multiplier, uint256 earns);
-
-    constructor() Ownable(msg.sender) {
-        authorizedToUseContract[msg.sender] = true;
-
-        IBlastPoints(0x2536FE9ab3F511540F2f9e2eC2A805005C3Dd800)
-            .configurePointsOperator(
-                0x4225d96C1d59D935c2b004823C184C4D9caF159e
-            );
-
-        USDB.configure(YieldMode.CLAIMABLE);
-        WETH.configure(YieldMode.CLAIMABLE);
-
-        BLAST.configureClaimableYield();
-        BLAST.configureAutomaticYield();
-        BLAST.configureClaimableYield();
-        BLAST.configureClaimableGas();
-
-        BLAST.configureGovernor(msg.sender);
-
-        for (uint256 i = 0; i < weights.length; i++) {
-            totalWeight += weights[i];
-        }
+    struct Item {
+        uint256 id;
+        string name;
+        string description;
+        uint256 damage;
+        uint256 attackSpeed;
+        uint256 durability;
+        uint256 durabilityPerUse;
+        string weaponType;
+        string imageUrl;
+        uint256 weightProbability;
+        string rarity;
     }
 
-    modifier onlyAuthorizedContract() {
-        require(
-            authorizedToUseContract[msg.sender],
-            "Not authorized to use this contract"
-        );
+    struct Crafting {
+        uint256[] itemIds;
+        uint256 totalCraftableItems;
+    }
+
+    Crafting private craftingContract;
+    uint256 public nextItemId;
+    bool public isCreationRestricted;
+
+    mapping(uint256 => Item) public items;
+    mapping(address => bool) public creators;
+
+    event ItemCreated(uint256 indexed itemId, address indexed owner);
+    event ItemUpdated(uint256 indexed itemId, uint256 durability);
+    event ItemDeleted(uint256 indexed itemId);
+    event CreatorAdded(address indexed creator);
+    event CreatorRemoved(address indexed creator);
+
+    modifier onlyCreator() {
+        require(creators[msg.sender], "Only owner or creator");
         _;
     }
 
-    function authorizeContract(address contractAddress, bool authorized)
-        external
-        onlyAuthorizedContract
+    constructor() Ownable(msg.sender) {
+        creators[msg.sender] = true;
+        isCreationRestricted = true;
+        emit CreatorAdded(msg.sender);
+    }
+
+    function addCreator(address _creator) external onlyOwner {
+        creators[_creator] = true;
+        emit CreatorAdded(_creator);
+    }
+
+    function removeCreator(address _creator) external onlyOwner {
+        creators[_creator] = false;
+        emit CreatorRemoved(_creator);
+    }
+
+    function setCreationRestriction(bool _isRestricted) external onlyOwner {
+        isCreationRestricted = _isRestricted;
+    }
+
+    function getCraftableItem(uint256 id)
+        public
+        view
+        returns (
+            string memory name,
+            string memory description,
+            uint256 damage,
+            uint256 attackSpeed,
+            uint256 durability,
+            uint256 durabilityPerUse,
+            string memory weaponType,
+            string memory imageUrl,
+            uint256 weightProbability,
+            string memory rarity
+        )
     {
-        authorizedToUseContract[contractAddress] = authorized;
-    }
-
-    function setContractNFTAddress(address _address) external onlyOwner {
-        CONTRACT_NFT = _address;
-    }
-
-    function updateRate(uint256 _rate) external onlyOwner {
-        RATE = _rate;
-    }
-
-    function updateWeightsPosition(uint256 position, uint256 value)
-        external
-        onlyOwner
-    {
-        weights[position] = value;
-    }
-
-    function updateMultipliersPosition(uint256 position, uint256 value)
-        external
-        onlyOwner
-    {
-        multipliers[position] = value;
-    }
-
-    function getMultiplier(uint256 _random) private view returns (uint256) {
-        uint256 randomValue = uint256(
-            keccak256(abi.encodePacked(block.timestamp, _random, msg.sender))
+        require(items[id].id != 0, "Item ID does not exist");
+        Item storage craftableItem = items[id];
+        return (
+            craftableItem.name,
+            craftableItem.description,
+            craftableItem.damage,
+            craftableItem.attackSpeed,
+            craftableItem.durability,
+            craftableItem.durabilityPerUse,
+            craftableItem.weaponType,
+            craftableItem.imageUrl,
+            craftableItem.weightProbability,
+            craftableItem.rarity
         );
+    }
 
-        uint256 weightedRandom = randomValue % totalWeight;
-        uint256 cumulativeWeight = 0;
-        for (uint256 i = 0; i < weights.length; i++) {
-            cumulativeWeight += weights[i];
-            if (weightedRandom < cumulativeWeight) {
-                return multipliers[i];
+    function getTotalCraftableItems() public view returns (uint256) {
+        return craftingContract.totalCraftableItems;
+    }
+
+    function createCraftableItem(
+        string memory name,
+        string memory description,
+        uint256 damage,
+        uint256 attackSpeed,
+        uint256 durability,
+        uint256 durabilityPerUse,
+        string memory weaponType,
+        string memory imageUrl,
+        uint256 weightProbability,
+        string memory rarity
+    ) external payable {
+        if (isCreationRestricted) {
+            require(
+                creators[msg.sender],
+                "Only owner or creator can create items"
+            );
+        }
+        nextItemId++;
+        Item memory newItem = Item({
+            id: nextItemId,
+            name: name,
+            description: description,
+            damage: damage,
+            attackSpeed: attackSpeed,
+            durability: durability,
+            durabilityPerUse: durabilityPerUse,
+            weaponType: weaponType,
+            imageUrl: imageUrl,
+            weightProbability: weightProbability,
+            rarity: rarity
+        });
+        items[nextItemId] = newItem;
+        craftingContract.itemIds.push(nextItemId);
+        craftingContract.totalCraftableItems++;
+        emit ItemCreated(nextItemId, msg.sender);
+    }
+
+    function editCraftableItem(
+        uint256 itemId,
+        string memory name,
+        string memory description,
+        uint256 damage,
+        uint256 attackSpeed,
+        uint256 durability,
+        uint256 durabilityPerUse,
+        string memory weaponType,
+        string memory imageUrl,
+        uint256 weightProbability,
+        string memory rarity
+    ) external onlyCreator {
+        require(items[itemId].id != 0, "Item ID does not exist");
+        Item storage craftableItem = items[itemId];
+        craftableItem.name = name;
+        craftableItem.description = description;
+        craftableItem.damage = damage;
+        craftableItem.attackSpeed = attackSpeed;
+        craftableItem.durability = durability;
+        craftableItem.durabilityPerUse = durabilityPerUse;
+        craftableItem.weaponType = weaponType;
+        craftableItem.imageUrl = imageUrl;
+        craftableItem.weightProbability = weightProbability;
+        craftableItem.rarity = rarity;
+        emit ItemUpdated(itemId, durability);
+    }
+
+    function deleteCraftableItem(uint256 itemId) external onlyOwner {
+        require(items[itemId].id != 0, "Item ID does not exist");
+        delete items[itemId];
+        for (uint256 i = 0; i < craftingContract.itemIds.length; i++) {
+            if (craftingContract.itemIds[i] == itemId) {
+                craftingContract.itemIds[i] = craftingContract.itemIds[
+                    craftingContract.itemIds.length - 1
+                ];
+                craftingContract.itemIds.pop();
+                break;
             }
         }
 
-        revert("No multipliers found.");
+        craftingContract.totalCraftableItems--;
+        emit ItemDeleted(itemId);
     }
 
-    function handleTokenEarnings(address _address, uint256 damage)
-        external
-        onlyAuthorizedContract
-        returns (uint256)
-    {
-        IERC20 currentToken = IERC20(WETH_ADDDRES);
-
-        uint256 currentAmount = currentToken.balanceOf(address(this));
-
-        uint256 totalDamage = RATE * damage;
-        uint256 multiplier = getMultiplier(totalDamage + currentAmount + 1);
-        uint256 deliveryEarns = ((totalDamage * multiplier) / 100);
-        emit tokenDrop(_address, multiplier, deliveryEarns);
-
-        if (deliveryEarns > currentAmount) {
-            deliveryEarns = currentAmount;
-        }
-
-        if (deliveryEarns > 0) {
-            currentToken.transfer(_address, deliveryEarns);
-        }
-
-        return deliveryEarns;
-    }
-
-    function handleNFTEarnings(address to) external onlyAuthorizedContract {
-        IERC721Enumerable currentToken = IERC721Enumerable(CONTRACT_NFT);
-        uint256 randomNumber = uint256(
-            keccak256(abi.encodePacked(block.timestamp))
-        );
-        uint256 randomInRange = randomNumber % 100;
-        uint256 balance = currentToken.balanceOf(address(this));
-        if (balance > 0 && randomInRange == 0) {
-            uint256 randomIndex = uint256(
-                keccak256(abi.encodePacked(block.timestamp, to))
-            ) % balance;
-            uint256 tokenId = currentToken.tokenOfOwnerByIndex(
-                address(this),
-                randomIndex
-            );
-            WorldOfBlastNft worldOfBlastNft = WorldOfBlastNft(CONTRACT_NFT);
-            worldOfBlastNft.restoreNFT(tokenId);
-            currentToken.safeTransferFrom(address(this), to, tokenId);
-        }
-    }
-
-    function withdrawBalance(address _contract, uint256 amount)
-        external
-        onlyOwner
-        returns (bool)
-    {
-        IERC20 currentToken = IERC20(_contract);
-        return
-            currentToken.transfer(
-                0x875b9a0C81c505b3f06D0669ac7ba4798aC8Ef09,
-                amount
-            );
-    }
-
-    function withdrawNFT(address _nftContractAddress, address to)
-        external
-        onlyOwner
-        returns (bool)
-    {
-        IERC721Enumerable currentToken = IERC721Enumerable(_nftContractAddress);
-        uint256 balance = currentToken.balanceOf(address(this));
-
-        while (balance > 0) {
-            uint256 tokenId = currentToken.tokenOfOwnerByIndex(
-                address(this),
-                balance - 1
-            );
-            currentToken.safeTransferFrom(address(this), to, tokenId);
-            balance--;
-        }
-
-        return true;
-    }
-
-    // Blast functions
-    function claimAllGas() external onlyOwner {
-        BLAST.claimAllGas(address(this), msg.sender);
-    }
-
-    function claimYieldTokens(address _recipient, uint256 _amount)
-        external
-        onlyOwner
-        returns (uint256, uint256)
-    {
-        return (
-            USDB.claim(_recipient, _amount),
-            WETH.claim(_recipient, _amount)
-        );
-    }
-
-    function getClaimableAmount(address _account)
-        external
-        view
-        returns (uint256, uint256)
-    {
-        return (
-            USDB.getClaimableAmount(_account),
-            WETH.getClaimableAmount(_account)
-        );
-    }
-
-    function updatePointsOperator(address _newOperator) external onlyOwner {
-        IBlastPoints(0x2536FE9ab3F511540F2f9e2eC2A805005C3Dd800)
-            .configurePointsOperatorOnBehalf(address(this), _newOperator);
-    }
-
-    function configureContract(
-        YieldMode _yield,
-        GasMode gasMode,
-        address governor
-    ) external onlyOwner {
-        BLAST.configureContract(address(this), _yield, gasMode, governor);
-    }
-
-    function configure(
-        YieldMode _yield,
-        GasMode gasMode,
-        address governor
-    ) external onlyOwner {
-        BLAST.configure(_yield, gasMode, governor);
-    }
-
-    function configureClaimableYieldOnBehalf() external onlyOwner {
-        BLAST.configureClaimableYieldOnBehalf(address(this));
-    }
-
-    function configureAutomaticYieldOnBehalf() external onlyOwner {
-        BLAST.configureAutomaticYieldOnBehalf(address(this));
-    }
-
-    function configureVoidYield() external onlyOwner {
-        BLAST.configureVoidYield();
-    }
-
-    function configureVoidYieldOnBehalf() external onlyOwner {
-        BLAST.configureVoidYieldOnBehalf(address(this));
-    }
-
-    function configureClaimableGasOnBehalf() external onlyOwner {
-        BLAST.configureClaimableGasOnBehalf(address(this));
-    }
-
-    function configureVoidGas() external onlyOwner {
-        BLAST.configureVoidGas();
-    }
-
-    function configureVoidGasOnBehalf() external onlyOwner {
-        BLAST.configureVoidGasOnBehalf(address(this));
-    }
-
-    function configureGovernor(address _governor) external onlyOwner {
-        BLAST.configureGovernor(_governor);
-    }
-
-    function configureGovernorOnBehalf(address _newGovernor)
-        external
-        onlyOwner
-    {
-        BLAST.configureGovernorOnBehalf(_newGovernor, address(this));
-    }
-
-    function claimYield(address recipient, uint256 amount) external onlyOwner {
-        BLAST.claimYield(address(this), recipient, amount);
-    }
-
-    function claimAllYield(address recipient) external onlyOwner {
-        BLAST.claimAllYield(address(this), recipient);
-    }
-
-    function claimGasAtMinClaimRate(
-        address recipientOfGas,
-        uint256 minClaimRateBips
-    ) external onlyOwner {
-        BLAST.claimGasAtMinClaimRate(
-            address(this),
-            recipientOfGas,
-            minClaimRateBips
-        );
-    }
-
-    function claimMaxGas(address recipientOfGas) external onlyOwner {
-        BLAST.claimMaxGas(address(this), recipientOfGas);
-    }
-
-    function claimGas(
-        address recipientOfGas,
-        uint256 gasToClaim,
-        uint256 gasSecondsToConsume
-    ) external onlyOwner {
-        BLAST.claimGas(
-            address(this),
-            recipientOfGas,
-            gasToClaim,
-            gasSecondsToConsume
-        );
-    }
-
-    function readClaimableYield() external view returns (uint256) {
-        return BLAST.readClaimableYield(address(this));
-    }
-
-    function readYieldConfiguration() external view returns (uint8) {
-        return BLAST.readYieldConfiguration(address(this));
-    }
-
-    function readGasParams()
-        external
+    function drawCraftableItem(uint256 nonce)
+        public
         view
         returns (
-            uint256 etherSeconds,
-            uint256 etherBalance,
-            uint256 lastUpdated,
-            GasMode
+            string memory name,
+            string memory description,
+            uint256 damage,
+            uint256 attackSpeed,
+            uint256 durability,
+            uint256 durabilityPerUse,
+            string memory weaponType,
+            string memory imageUrl,
+            uint256 weightProbability,
+            string memory rarity
         )
     {
-        return BLAST.readGasParams(address(this));
+        require(craftingContract.totalCraftableItems > 0, "No items available");
+
+        uint256 totalWeight = 0;
+
+        for (uint256 i = 0; i < craftingContract.itemIds.length; i++) {
+            totalWeight = totalWeight.add(
+                items[craftingContract.itemIds[i]].weightProbability
+            );
+        }
+
+        require(totalWeight > 0, "Total weight must be greater than zero");
+
+        uint256 cumulativeWeight = 0;
+
+        uint256 randomWeight = random(totalWeight, nonce);
+
+        for (uint256 i = 0; i < craftingContract.itemIds.length; i++) {
+            uint256 currentItemWeight = items[craftingContract.itemIds[i]]
+                .weightProbability;
+
+            cumulativeWeight = cumulativeWeight.add(currentItemWeight);
+
+            if (randomWeight <= cumulativeWeight) {
+                Item storage selectedItem = items[craftingContract.itemIds[i]];
+                return (
+                    selectedItem.name,
+                    selectedItem.description,
+                    selectedItem.damage,
+                    selectedItem.attackSpeed,
+                    selectedItem.durability,
+                    selectedItem.durabilityPerUse,
+                    selectedItem.weaponType,
+                    selectedItem.imageUrl,
+                    selectedItem.weightProbability,
+                    selectedItem.rarity
+                );
+            }
+        }
+
+        revert("No item selected");
+    }
+
+    function random(uint256 limit, uint256 nonce)
+        internal
+        view
+        returns (uint256)
+    {
+        uint256 randomIndex = uint256(
+            keccak256(abi.encodePacked(block.timestamp, limit, nonce))
+        ) % 99999999999999;
+        return
+            uint256(
+                keccak256(
+                    abi.encodePacked(
+                        block.timestamp,
+                        nonce,
+                        randomIndex,
+                        msg.sender
+                    )
+                )
+            ) % limit;
+    }
+
+    function withdrawERC20(
+        address _contract,
+        address to,
+        uint256 amount
+    ) external onlyOwner {
+        require(IERC20(_contract).transfer(to, amount), "Failed to transfer");
     }
 }

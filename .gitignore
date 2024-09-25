@@ -10,6 +10,7 @@ web/*
 
 # testing
 /coverage
+/cache
 
 # production
 /build

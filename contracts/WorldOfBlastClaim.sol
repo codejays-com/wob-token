@@ -1,9 +1,10 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
+import "./BlastContract.sol";
 import "@openzeppelin/contracts/token/ERC721/IERC721.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import "https://github.com/codejays-com/wob-token/blob/main/BlastContract.sol";
+
 
 interface WorldOfBlastNft {
     function restoreNFT(uint256 tokenId) external;
