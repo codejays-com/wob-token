@@ -1,12 +1,11 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.0;
-
-import "./SafeMath.sol";
+pragma solidity ^0.8.26;
 import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
 import "@openzeppelin/contracts/token/ERC721/extensions/ERC721Enumerable.sol";
 import "@openzeppelin/contracts/token/ERC721/extensions/ERC721URIStorage.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 
 interface IWorldOfBlastCrafting {
     function getCraftableItem(uint256 id)
@@ -42,9 +41,12 @@ interface IWorldOfBlastCrafting {
         );
 }
 
-contract WorldOfBlastNft is ERC721Enumerable, ERC721URIStorage, Ownable {
-    using SafeMath for uint256;
-
+contract WorldOfBlastNft is
+    ERC721Enumerable,
+    ERC721URIStorage,
+    Ownable,
+    ReentrancyGuard
+{
     struct Item {
         string name;
         string description;
@@ -75,6 +77,8 @@ contract WorldOfBlastNft is ERC721Enumerable, ERC721URIStorage, Ownable {
     mapping(address => bool) public creators;
     mapping(address => mapping(uint256 => bool))
         public authorizedContractsByItem;
+
+    mapping(address => bool) public whitelistedContracts;
 
     event ItemCreated(uint256 indexed tokenId, address indexed owner);
     event ItemUpdated(uint256 indexed tokenId, uint256 durability);
@@ -130,6 +134,10 @@ contract WorldOfBlastNft is ERC721Enumerable, ERC721URIStorage, Ownable {
         _addressSendWOB = address(this);
     }
 
+    function addToWhitelist(address contractAddress) external onlyOwner {
+        whitelistedContracts[contractAddress] = true;
+    }
+
     function withdrawERC20(
         address _contract,
         address to,
@@ -140,6 +148,25 @@ contract WorldOfBlastNft is ERC721Enumerable, ERC721URIStorage, Ownable {
 
     function updateWOBAddress(address _newWobAddress) external onlyOwner {
         WOB = IERC20(_newWobAddress);
+    }
+
+    function authorizeContract(
+        address contractAddress,
+        uint256 tokenId,
+        bool authorized
+    ) external notStaked(tokenId) nonReentrant {
+        require(
+            ownerOf(tokenId) == msg.sender,
+            "Only the owner can authorize a contract"
+        );
+
+        require(
+            whitelistedContracts[contractAddress],
+            "Contract is not whitelisted"
+        );
+
+        authorizedContractsByItem[contractAddress][tokenId] = authorized;
+        emit AuthorizedContract(contractAddress, tokenId, authorized);
     }
 
     function updateCraftingContractAddress(address _newCraftingAddress)
@@ -177,6 +204,7 @@ contract WorldOfBlastNft is ERC721Enumerable, ERC721URIStorage, Ownable {
     function mint(uint256 craftableItemId, uint256 quantity)
         external
         onlyCreator
+        nonReentrant
     {
         for (uint256 i = 0; i < quantity; i++) {
             uint256 tokenId = tokenIdCounter++;
@@ -212,12 +240,18 @@ contract WorldOfBlastNft is ERC721Enumerable, ERC721URIStorage, Ownable {
         }
     }
 
-    function mintWithWOB(uint256 quantity) external returns (uint256[] memory) {
+    function mintWithErc20(uint256 quantity)
+        external
+        nonReentrant
+        returns (uint256[] memory)
+    {
         uint256 priceWOB = priceToCreateNftWOB * quantity;
+
         require(
             WOB.balanceOf(msg.sender) >= priceWOB,
             "Insufficient WOB balance"
         );
+
         require(
             WOB.transferFrom(msg.sender, _addressSendWOB, priceWOB),
             "Failed to transfer WOB"
@@ -265,40 +299,34 @@ contract WorldOfBlastNft is ERC721Enumerable, ERC721URIStorage, Ownable {
     function updateImage(uint256 tokenId, string memory imageUrl)
         external
         onlyCreator
+        nonReentrant
     {
         _setTokenURI(tokenId, imageUrl);
         items[tokenId].imageUrl = imageUrl;
     }
 
-    function authorizeContract(
-        address contractAddress,
-        uint256 tokenId,
-        bool authorized
-    ) external notStaked(tokenId) {
-        require(
-            ownerOf(tokenId) == msg.sender,
-            "Only the owner can authorize a contract"
-        );
-
-        authorizedContractsByItem[contractAddress][tokenId] = authorized;
-        emit AuthorizedContract(contractAddress, tokenId, authorized);
-    }
-
     function updateDurability(uint256 tokenId, uint256 newDurability)
         external
+        nonReentrant
         onlyAuthorizedContract(tokenId)
     {
+        require(
+            items[tokenId].maxDurability > newDurability,
+            "New durability exceeds maximum allowed"
+        );
+
         items[tokenId].durability = newDurability;
         emit ItemUpdated(tokenId, newDurability);
     }
 
-    function restoreNFT(uint256 tokenId) external onlyRestore {
+    function restoreNFT(uint256 tokenId) external onlyRestore nonReentrant {
         items[tokenId].durability = items[tokenId].maxDurability;
         emit ItemUpdated(tokenId, items[tokenId].maxDurability);
     }
 
     function setStakedStatus(uint256 tokenId, bool status)
         external
+        nonReentrant
         onlyAuthorizedContract(tokenId)
     {
         items[tokenId].isStaked = status;

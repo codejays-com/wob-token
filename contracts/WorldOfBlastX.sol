@@ -1,11 +1,10 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.2;
-import "./SafeMath.sol";
+
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 
 contract ERC20 is IERC20 {
-    using SafeMath for uint256;
 
     uint256 public totalSupply;
     mapping(address => uint256) public balanceOf;
@@ -31,7 +30,7 @@ contract ERC20 is IERC20 {
         _approve(
             msg.sender,
             _spender,
-            _allowance[msg.sender][_spender].add(_value)
+            _allowance[msg.sender][_spender] + _value
         );
         return true;
     }
@@ -43,7 +42,7 @@ contract ERC20 is IERC20 {
         _approve(
             msg.sender,
             _spender,
-            _allowance[msg.sender][_spender].sub(_value)
+            _allowance[msg.sender][_spender] - _value
         );
         return true;
     }
@@ -62,7 +61,7 @@ contract ERC20 is IERC20 {
         uint256 _value
     ) public returns (bool _success) {
         _transfer(_from, _to, _value);
-        _approve(_from, msg.sender, _allowance[_from][msg.sender].sub(_value));
+        _approve(_from, msg.sender, _allowance[_from][msg.sender] - _value);
         return true;
     }
 
@@ -90,8 +89,8 @@ contract ERC20 is IERC20 {
             "ERC20: transfer to this contract address"
         );
 
-        balanceOf[_from] = balanceOf[_from].sub(_value);
-        balanceOf[_to] = balanceOf[_to].add(_value);
+        balanceOf[_from] = balanceOf[_from] + _value;
+        balanceOf[_to] = balanceOf[_to] + _value;
         emit Transfer(_from, _to, _value);
     }
 }

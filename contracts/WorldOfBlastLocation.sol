@@ -1,14 +1,12 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-import "./SafeMath.sol";
 import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
 import "@openzeppelin/contracts/token/ERC721/extensions/ERC721URIStorage.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 contract WorldOfBlastLocation is ERC721URIStorage, Ownable {
-    using SafeMath for uint256;
 
     struct Monster {
         uint256 id;
@@ -100,13 +98,13 @@ contract WorldOfBlastLocation is ERC721URIStorage, Ownable {
         require(monsterIdCounter > 1, "No monsters available");
         uint256 totalWeight = 0;
         for (uint256 i = 1; i < monsterIdCounter; i++) {
-            totalWeight = totalWeight.add(monsters[i].weight);
+            totalWeight = totalWeight + monsters[i].weight;
         }
         uint256 randomWeight = random(block.timestamp, totalWeight);
 
         uint256 cumulativeWeight = 0;
         for (uint256 i = 1; i < monsterIdCounter; i++) {
-            cumulativeWeight = cumulativeWeight.add(monsters[i].weight);
+            cumulativeWeight = cumulativeWeight + monsters[i].weight;
             if (randomWeight < cumulativeWeight) {
                 return monsters[i];
             }

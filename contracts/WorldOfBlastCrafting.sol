@@ -1,12 +1,10 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.27;
 import "@openzeppelin/contracts/access/Ownable.sol";
-import "@openzeppelin/contracts/utils/math/SafeMath.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
 contract WorldOfBlastCrafting is Ownable {
-    using SafeMath for uint256;
     using SafeERC20 for IERC20;
 
     struct Item {
@@ -206,9 +204,8 @@ contract WorldOfBlastCrafting is Ownable {
         uint256 totalWeight = 0;
 
         for (uint256 i = 0; i < craftingContract.itemIds.length; i++) {
-            totalWeight = totalWeight.add(
-                items[craftingContract.itemIds[i]].weightProbability
-            );
+            totalWeight = totalWeight + items[craftingContract.itemIds[i]].weightProbability;
+        
         }
 
         require(totalWeight > 0, "Total weight must be greater than zero");
@@ -221,7 +218,7 @@ contract WorldOfBlastCrafting is Ownable {
             uint256 currentItemWeight = items[craftingContract.itemIds[i]]
                 .weightProbability;
 
-            cumulativeWeight = cumulativeWeight.add(currentItemWeight);
+            cumulativeWeight = cumulativeWeight + currentItemWeight;
 
             if (randomWeight <= cumulativeWeight) {
                 Item storage selectedItem = items[craftingContract.itemIds[i]];

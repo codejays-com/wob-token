@@ -6,7 +6,6 @@ import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 
 contract WorldOfBlastSwap is Ownable {
-    using SafeERC20 for IERC20;
 
     IERC20 public wob;
     IERC20 public wobx;
@@ -50,12 +49,12 @@ contract WorldOfBlastSwap is Ownable {
     }
 
     function withdrawWobx(address _to, uint256 _amount) external onlyOwner {
-        wobx.safeTransfer(_to, _amount);
+        wobx.transfer(_to, _amount);
         emit Withdrawn(_to, address(wobx), _amount);
     }
 
     function withdrawWob(address _to, uint256 _amount) external onlyOwner {
-        wob.safeTransfer(_to, _amount);
+        wob.transfer(_to, _amount);
         emit Withdrawn(_to, address(wob), _amount);
     }
 
@@ -65,8 +64,8 @@ contract WorldOfBlastSwap is Ownable {
             "You need to approve the contract to spend your WOB tokens"
         );
 
-        wob.safeTransferFrom(msg.sender, address(this), _amount);
-        wobx.safeTransfer(msg.sender, _amount);
+        wob.transferFrom(msg.sender, address(this), _amount);
+        wobx.transfer(msg.sender, _amount);
 
         emit Swapped(msg.sender, address(wob), address(wobx), _amount);
     }
@@ -77,8 +76,8 @@ contract WorldOfBlastSwap is Ownable {
             "You need to approve the contract to spend your WOBX tokens"
         );
 
-        wobx.safeTransferFrom(msg.sender, address(this), _amount);
-        wob.safeTransfer(msg.sender, _amount);
+        wobx.transferFrom(msg.sender, address(this), _amount);
+        wob.transfer(msg.sender, _amount);
 
         emit Swapped(msg.sender, address(wobx), address(wob), _amount);
     }
