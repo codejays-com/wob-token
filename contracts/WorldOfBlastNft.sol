@@ -67,7 +67,6 @@ contract WorldOfBlastNft is
 
     address payable public _owner;
     address public _addressSendWOB;
-    address public _addressRestore;
 
     uint256 public priceToCreateNftWOB;
     uint256 public tokenIdCounter;
@@ -115,11 +114,6 @@ contract WorldOfBlastNft is
         _;
     }
 
-    modifier onlyRestore() {
-        require(msg.sender == _addressRestore, "Only restorer");
-        _;
-    }
-
     constructor() ERC721("World Of Blast", "WOBNFTs") Ownable(msg.sender) {
         WOB = IERC20(0x0BCAEec9dF553b0E59a0928FCCd9dcf8C0b42601);
 
@@ -130,7 +124,6 @@ contract WorldOfBlastNft is
         _owner = payable(msg.sender);
         _contractURI = "https://worldofblast.com/assets/contract.json";
         creators[msg.sender] = true;
-        _addressRestore = msg.sender;
         _addressSendWOB = address(this);
     }
 
@@ -183,10 +176,6 @@ contract WorldOfBlastNft is
 
     function updateAddressSendWOB(address _address) external onlyOwner {
         _addressSendWOB = _address;
-    }
-
-    function updateContractRestore(address _address) external onlyOwner {
-        _addressRestore = _address;
     }
 
     function updatePriceToCreateNftWOB(uint256 price) external onlyOwner {
@@ -317,11 +306,6 @@ contract WorldOfBlastNft is
 
         items[tokenId].durability = newDurability;
         emit ItemUpdated(tokenId, newDurability);
-    }
-
-    function restoreNFT(uint256 tokenId) external onlyRestore nonReentrant {
-        items[tokenId].durability = items[tokenId].maxDurability;
-        emit ItemUpdated(tokenId, items[tokenId].maxDurability);
     }
 
     function setStakedStatus(uint256 tokenId, bool status)
