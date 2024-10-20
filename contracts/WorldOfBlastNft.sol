@@ -75,7 +75,7 @@ contract WorldOfBlastNft is
     mapping(uint256 => Item) private items;
     mapping(address => bool) public creators;
     mapping(address => mapping(uint256 => bool))
-        public authorizedContractsByItem;
+    public authorizedContractsByItem;
 
     mapping(address => bool) public whitelistedContracts;
 
@@ -87,6 +87,7 @@ contract WorldOfBlastNft is
         uint256 indexed tokenId,
         bool authorized
     );
+    event NFTStakedStatus(uint256 indexed tokenId, bool isStaked);
 
     modifier onlyTokenOwner(uint256 tokenId) {
         require(
@@ -131,6 +132,10 @@ contract WorldOfBlastNft is
         whitelistedContracts[contractAddress] = true;
     }
 
+    function removeFromWhiteList(address contractAddress) external onlyOwner {
+        whitelistedContracts[contractAddress] = false;
+    }
+
     function withdrawERC20(
         address _contract,
         address to,
@@ -152,7 +157,6 @@ contract WorldOfBlastNft is
             ownerOf(tokenId) == msg.sender,
             "Only the owner can authorize a contract"
         );
-
         require(
             whitelistedContracts[contractAddress],
             "Contract is not whitelisted"
@@ -314,15 +318,9 @@ contract WorldOfBlastNft is
         onlyAuthorizedContract(tokenId)
     {
         items[tokenId].isStaked = status;
+        emit NFTStakedStatus(tokenId, status);
     }
 
-    function transferItem(address to, uint256 tokenId)
-        external
-        onlyTokenOwner(tokenId)
-        notStaked(tokenId)
-    {
-        _transfer(msg.sender, to, tokenId);
-    }
 
     function tokenURI(uint256 tokenId)
         public
