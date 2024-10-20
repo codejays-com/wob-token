@@ -6,6 +6,7 @@ import "@openzeppelin/contracts/token/ERC721/extensions/ERC721URIStorage.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
+import "./interfaces/IBlast.sol";
 
 interface IWorldOfBlastCrafting {
     function getCraftableItem(uint256 id)
@@ -41,6 +42,7 @@ interface IWorldOfBlastCrafting {
         );
 }
 
+
 contract WorldOfBlastNft is
     ERC721Enumerable,
     ERC721URIStorage,
@@ -60,6 +62,10 @@ contract WorldOfBlastNft is
         bool isStaked;
         string rarity;
     }
+
+    IBlast public constant BLAST =
+        IBlast(0x4300000000000000000000000000000000000002);
+
 
     IERC20 public WOB;
 
@@ -126,6 +132,50 @@ contract WorldOfBlastNft is
         _contractURI = "https://worldofblast.com/assets/contract.json";
         creators[msg.sender] = true;
         _addressSendWOB = address(this);
+
+        BLAST.configureClaimableGas();
+    }
+
+    // Blast functions
+    function claimAllGas() external onlyOwner {
+        BLAST.claimAllGas(address(this), msg.sender);
+    }
+    function claimGasAtMinClaimRate(
+        address recipientOfGas,
+        uint256 minClaimRateBips
+    ) external onlyOwner {
+        BLAST.claimGasAtMinClaimRate(
+            address(this),
+            recipientOfGas,
+            minClaimRateBips
+        );
+    }
+     function claimGas(
+        address recipientOfGas,
+        uint256 gasToClaim,
+        uint256 gasSecondsToConsume
+    ) external onlyOwner {
+        BLAST.claimGas(
+            address(this),
+            recipientOfGas,
+            gasToClaim,
+            gasSecondsToConsume
+        );
+    }
+    function readGasParams()
+        external
+        view
+        returns (
+            uint256 etherSeconds,
+            uint256 etherBalance,
+            uint256 lastUpdated,
+            GasMode
+        )
+    {
+        return BLAST.readGasParams(address(this));
+    }
+    function configureClaimableGasOnBehalf() external onlyOwner {
+        BLAST.configureClaimableGasOnBehalf(address(this));
     }
 
     function addToWhitelist(address contractAddress) external onlyOwner {
