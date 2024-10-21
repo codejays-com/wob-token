@@ -1,22 +1,11 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.27;
+pragma solidity ^0.8.26;
 
 import "@openzeppelin/contracts/token/ERC721/IERC721.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
-
-
-enum YieldMode {
-    AUTOMATIC,
-    VOID,
-    CLAIMABLE
-}
-enum GasMode {
-    VOID,
-    CLAIMABLE
-}
 
 interface IMonsterContract {
     struct Monster {
@@ -76,6 +65,7 @@ contract WorldOfBlastGame is Ownable, ReentrancyGuard {
         uint256 startTime;
         uint256 endTime;
         IMonsterContract.Monster monster;
+        address nftContract;
     }
 
     struct WeaponToken {
@@ -87,17 +77,19 @@ contract WorldOfBlastGame is Ownable, ReentrancyGuard {
 
     address[] public locations;
     uint256 public huntCount = 0;
-    address public _operator;
 
     mapping(address => uint256) public huntStartTimes;
     mapping(address => uint256) public activeHuntId;
+    mapping(address => bool) public authorizedNFTContracts;
+    mapping(address => mapping(uint256 => bool)) public nftInHunt;
 
     mapping(uint256 => Hunt) public hunts;
 
     event HuntHasBegun(
         uint256 indexed huntId,
         uint256 startTime,
-        uint256 weapon,
+        address indexed nftContract,
+        uint256 indexed weapon,
         address hunter,
         address location,
         string monster
@@ -111,18 +103,9 @@ contract WorldOfBlastGame is Ownable, ReentrancyGuard {
         uint256 durability
     );
 
-    event updateNFTContract(address _contract);
-    event updateDropContract(address _contract);
-
     address public contractDropAddress;
 
-    constructor() Ownable(msg.sender) {
-        _operator = msg.sender;
-
-        NFTContract = IExtendedERC721(
-            0x71081A6C32006dA21b26d9ca0b0d3FC8e95A2F90
-        );
-    }
+    constructor() Ownable(msg.sender) {}
 
     function getActiveHuntDetails(address userAddress)
         public
@@ -155,9 +138,11 @@ contract WorldOfBlastGame is Ownable, ReentrancyGuard {
         revert("No active hunt found for this user");
     }
 
-    function setNFTContract(address _nftContractAddress) public onlyOwner {
-        NFTContract = IExtendedERC721(_nftContractAddress);
-        emit updateNFTContract(_nftContractAddress);
+    function setAuthorizedNFTContract(address nftContract, bool authorized)
+        public
+        onlyOwner
+    {
+        authorizedNFTContracts[nftContract] = authorized;
     }
 
     function setContractDropAddress(address _contractDropAddress)
@@ -165,54 +150,6 @@ contract WorldOfBlastGame is Ownable, ReentrancyGuard {
         onlyOwner
     {
         contractDropAddress = _contractDropAddress;
-        emit updateDropContract(_contractDropAddress);
-    }
-
-    function startHunt(address _location, uint256 nftId)
-        public
-        returns (uint256)
-    {
-        require(
-            NFTContract.ownerOf(nftId) == msg.sender,
-            "Not the owner of the NFT"
-        );
-
-        require(huntStartTimes[msg.sender] == 0, "Hunt already started");
-
-        NFTContract.setStakedStatus(nftId, true);
-
-        IMonsterContract monsterContract = IMonsterContract(_location);
-
-        IMonsterContract.Monster memory monster = monsterContract.drawMonster();
-
-        huntCount++;
-
-        Hunt memory newHunt = Hunt({
-            id: huntCount,
-            hunter: msg.sender,
-            location: _location,
-            weapon: nftId,
-            startTime: block.timestamp,
-            endTime: 0,
-            monster: monster
-        });
-
-        hunts[huntCount] = newHunt;
-
-        activeHuntId[msg.sender] = huntCount;
-
-        huntStartTimes[msg.sender] = block.timestamp;
-
-        emit HuntHasBegun(
-            huntCount,
-            newHunt.startTime,
-            nftId,
-            msg.sender,
-            _location,
-            monster.name
-        );
-
-        return huntCount;
     }
 
     function getWeaponToken(uint256 huntId)
@@ -221,7 +158,7 @@ contract WorldOfBlastGame is Ownable, ReentrancyGuard {
         returns (WeaponToken memory)
     {
         uint256 weaponTokenId = hunts[huntId].weapon;
-
+        IExtendedERC721 nft = IExtendedERC721(hunts[huntId].nftContract);
         (
             ,
             ,
@@ -232,7 +169,7 @@ contract WorldOfBlastGame is Ownable, ReentrancyGuard {
             ,
             ,
 
-        ) = NFTContract.getItemDetails(weaponTokenId);
+        ) = nft.getItemDetails(weaponTokenId);
 
         WeaponToken memory weaponToken = WeaponToken({
             damage: damage,
@@ -273,11 +210,78 @@ contract WorldOfBlastGame is Ownable, ReentrancyGuard {
         uint256 totalEffectiveHits
     ) internal pure returns (uint256) {
         durability -= totalEffectiveHits * durabilityPerUse;
-
         return (durability);
     }
 
-    function endHunt(uint256 huntId) public {
+    function isEOA(address _address) internal view returns (bool) {
+        uint256 size;
+        assembly {
+            size := extcodesize(_address)
+        }
+        return size == 0;
+    }
+
+    function startHunt(
+        address _location,
+        address nftContract,
+        uint256 nftId
+    ) public nonReentrant returns (uint256) {
+        require(
+            authorizedNFTContracts[nftContract],
+            "NFT contract not authorized"
+        );
+
+        IExtendedERC721 nft = IExtendedERC721(nftContract);
+
+        require(nft.ownerOf(nftId) == msg.sender, "Not the owner of the NFT");
+
+        require(huntStartTimes[msg.sender] == 0, "Hunt already started");
+
+        require(
+            isEOA(msg.sender),
+            "Only externally owned accounts can call this function"
+        );
+
+        require(!nftInHunt[nftContract][nftId], "NFT is already in a hunt");
+
+        nft.setStakedStatus(nftId, true);
+
+        IMonsterContract monsterContract = IMonsterContract(_location);
+        IMonsterContract.Monster memory monster = monsterContract.drawMonster();
+
+        huntCount++;
+
+        Hunt memory newHunt = Hunt({
+            id: huntCount,
+            hunter: msg.sender,
+            location: _location,
+            weapon: nftId,
+            startTime: block.timestamp,
+            endTime: 0,
+            monster: monster,
+            nftContract: nftContract
+        });
+
+        hunts[huntCount] = newHunt;
+        activeHuntId[msg.sender] = huntCount;
+        huntStartTimes[msg.sender] = block.timestamp;
+
+        nftInHunt[nftContract][nftId] = true;
+
+        emit HuntHasBegun(
+            huntCount,
+            newHunt.startTime,
+            nftContract,
+            nftId,
+            msg.sender,
+            _location,
+            monster.name
+        );
+
+        return huntCount;
+    }
+
+    function endHunt(uint256 huntId) public nonReentrant {
         require(
             hunts[huntId].hunter == msg.sender,
             "Not the hunter of this hunt"
@@ -288,28 +292,25 @@ contract WorldOfBlastGame is Ownable, ReentrancyGuard {
         huntStartTimes[msg.sender] = 0;
         activeHuntId[msg.sender] = 0;
 
+        address _nftContract = hunts[huntId].nftContract;
+
+        IExtendedERC721 nft = IExtendedERC721(_nftContract);
+
         WeaponToken memory weaponToken = getWeaponToken(huntId);
 
-        uint256 attackSpeed = weaponToken.attackSpeed;
-        uint256 durability = weaponToken.durability;
-        uint256 durabilityPerUse = weaponToken.durabilityPerUse;
-        uint256 damage = weaponToken.damage;
-
-        (uint256 effectiveHitCounter) = handleCharacterBattleHits(
-            attackSpeed,
-            durability,
-            durabilityPerUse,
+        uint256 effectiveHitCounter = handleCharacterBattleHits(
+            weaponToken.attackSpeed,
+            weaponToken.durability,
+            weaponToken.durabilityPerUse,
             hunts[huntId].startTime,
             hunts[huntId].endTime
         );
 
-        (uint256 currentDurability) = handleCharacterBattleDurability(
-            durability,
-            durabilityPerUse,
+        uint256 currentDurability = handleCharacterBattleDurability(
+            weaponToken.durability,
+            weaponToken.durabilityPerUse,
             effectiveHitCounter
         );
-               
-        uint256 totalDamage = effectiveHitCounter * damage;
 
         emit HuntEnd(
             huntId,
@@ -319,13 +320,19 @@ contract WorldOfBlastGame is Ownable, ReentrancyGuard {
             currentDurability
         );
 
-        NFTContract.updateDurability(hunts[huntId].weapon, currentDurability);
-        NFTContract.setStakedStatus(hunts[huntId].weapon, false);
+        nft.updateDurability(hunts[huntId].weapon, currentDurability);
+
+        nft.setStakedStatus(hunts[huntId].weapon, false);
+
+        nftInHunt[_nftContract][hunts[huntId].weapon] = false;
 
         WorldOfBlastDrop worldOfBlastDrop = WorldOfBlastDrop(
             contractDropAddress
         );
 
-        worldOfBlastDrop.handleTokenEarnings(msg.sender, totalDamage);
+        worldOfBlastDrop.handleTokenEarnings(
+            msg.sender,
+            effectiveHitCounter * weaponToken.damage
+        );
     }
 }
