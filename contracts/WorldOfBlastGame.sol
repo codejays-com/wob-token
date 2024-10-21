@@ -6,6 +6,7 @@ import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
+import "interfaces/IBlast.sol";
 
 interface IMonsterContract {
     struct Monster {
@@ -75,6 +76,9 @@ contract WorldOfBlastGame is Ownable, ReentrancyGuard {
         uint256 durabilityPerUse;
     }
 
+    IBlast public constant BLAST =
+        IBlast(0x4300000000000000000000000000000000000002);
+
     address[] public locations;
     uint256 public huntCount = 0;
 
@@ -108,6 +112,49 @@ contract WorldOfBlastGame is Ownable, ReentrancyGuard {
 
     constructor() Ownable(msg.sender) {
         paused = false;
+        BLAST.configureClaimableGas();
+    }
+
+    // Blast functions
+    function claimAllGas() external onlyOwner {
+        BLAST.claimAllGas(address(this), msg.sender);
+    }
+    function claimGasAtMinClaimRate(
+        address recipientOfGas,
+        uint256 minClaimRateBips
+    ) external onlyOwner {
+        BLAST.claimGasAtMinClaimRate(
+            address(this),
+            recipientOfGas,
+            minClaimRateBips
+        );
+    }
+     function claimGas(
+        address recipientOfGas,
+        uint256 gasToClaim,
+        uint256 gasSecondsToConsume
+    ) external onlyOwner {
+        BLAST.claimGas(
+            address(this),
+            recipientOfGas,
+            gasToClaim,
+            gasSecondsToConsume
+        );
+    }
+    function readGasParams()
+        external
+        view
+        returns (
+            uint256 etherSeconds,
+            uint256 etherBalance,
+            uint256 lastUpdated,
+            GasMode
+        )
+    {
+        return BLAST.readGasParams(address(this));
+    }
+    function configureClaimableGasOnBehalf() external onlyOwner {
+        BLAST.configureClaimableGasOnBehalf(address(this));
     }
 
     function pauseGame() external onlyOwner {
