@@ -104,8 +104,19 @@ contract WorldOfBlastGame is Ownable, ReentrancyGuard {
     );
 
     address public contractDropAddress;
+    bool public paused;
 
-    constructor() Ownable(msg.sender) {}
+    constructor() Ownable(msg.sender) {
+        paused = false;
+    }
+
+    function pauseGame() external onlyOwner {
+        paused = true;
+    }
+
+    function unpauseGame() external onlyOwner {
+        paused = false;
+    }
 
     function getActiveHuntDetails(address userAddress)
         public
@@ -226,6 +237,7 @@ contract WorldOfBlastGame is Ownable, ReentrancyGuard {
         address nftContract,
         uint256 nftId
     ) public nonReentrant returns (uint256) {
+        require(!paused, "Game is paused");
         require(
             authorizedNFTContracts[nftContract],
             "NFT contract not authorized"
@@ -334,5 +346,58 @@ contract WorldOfBlastGame is Ownable, ReentrancyGuard {
             msg.sender,
             effectiveHitCounter * weaponToken.damage
         );
+    }
+
+    function endAllHunts() public onlyOwner {
+        for (uint256 i = 1; i <= huntCount; i++) {
+            if (hunts[i].endTime == 0) {
+                address hunter = hunts[i].hunter;
+                hunts[i].endTime = block.timestamp;
+                huntStartTimes[hunter] = 0;
+                activeHuntId[hunter] = 0;
+
+                address _nftContract = hunts[i].nftContract;
+
+                IExtendedERC721 nft = IExtendedERC721(_nftContract);
+
+                WeaponToken memory weaponToken = getWeaponToken(i);
+
+                uint256 effectiveHitCounter = handleCharacterBattleHits(
+                    weaponToken.attackSpeed,
+                    weaponToken.durability,
+                    weaponToken.durabilityPerUse,
+                    hunts[i].startTime,
+                    hunts[i].endTime
+                );
+
+                uint256 currentDurability = handleCharacterBattleDurability(
+                    weaponToken.durability,
+                    weaponToken.durabilityPerUse,
+                    effectiveHitCounter
+                );
+
+                emit HuntEnd(
+                    i,
+                    hunts[i].startTime,
+                    hunts[i].endTime,
+                    effectiveHitCounter,
+                    currentDurability
+                );
+
+                nft.updateDurability(hunts[i].weapon, currentDurability);
+                nft.setStakedStatus(hunts[i].weapon, false);
+
+                nftInHunt[_nftContract][hunts[i].weapon] = false;
+
+                WorldOfBlastDrop worldOfBlastDrop = WorldOfBlastDrop(
+                    contractDropAddress
+                );
+
+                worldOfBlastDrop.handleTokenEarnings(
+                    hunter,
+                    effectiveHitCounter * weaponToken.damage
+                );
+            }
+        }
     }
 }
