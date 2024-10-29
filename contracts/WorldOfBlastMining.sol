@@ -20,7 +20,7 @@ contract WobMiningAndSmelting is Ownable(msg.sender), ReentrancyGuard {
     uint256 public oreMiningReward = 50 * 10**18;  // 50 Ore tokens per block
     uint256 public txFee = 1 * 10**16;  
     uint256 public blockInterval = 60;  //60s block interval for mining
-    uint256 public smeltingDuration = 1;  // Time required for smelting (30 minutes)
+    uint256 public smeltingDuration = 5;  // Time required for smelting (30 minutes), 5 seconds for now
 
     uint256 public lastBlockTime;
 
@@ -56,7 +56,6 @@ contract WobMiningAndSmelting is Ownable(msg.sender), ReentrancyGuard {
     function mine() external nonReentrant {
         minersPerBlock[blockNumber + 1].push(msg.sender);  // Add a mine event to the next block
 
-
         // Check if the block interval has passed, if so, distribute rewards and start a new block
         if (block.timestamp >= lastBlockTime + blockInterval) {
             tryDistributeMiningRewards();
@@ -85,21 +84,15 @@ contract WobMiningAndSmelting is Ownable(msg.sender), ReentrancyGuard {
             address selectedMiner = _selectRandomMiner();
 
             // Distribute Ore reward to the selected miner
-            // oreToken.mint(selectedMiner, oreMiningReward);
+            oreToken.mint(selectedMiner, oreMiningReward);
+
             currentWinner = selectedMiner;
             claimGasFees(currentWinner);
 
-
             emit NewBlock(blockNumber, selectedMiner);  // Emit new block event
         }
-
-        // no miners in previous block, no rewards :)
         else {
-            //
-
-            // Distribute Ore reward to the selected miner
-            // oreToken.mint(selectedMiner, oreMiningReward);
-
+            // no miners in previous block, no rewards :)
             emit NewBlock(blockNumber, 0x0000000000000000000000000000000000000000);  // Emit new block event
         }
         
