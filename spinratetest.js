@@ -65,22 +65,33 @@ const NUMBERS = [
 var playerStakeBank = 0;
 var incentivesBank = 0;
 var houseBank = 0;
-var pool = 0;
+var pool = 100;
+
+const rakeOnLoss = 553000 / 10000000 // = 5.25%
 const totalOptions = 37;
 
 var numberRed = 0;
 var numberBlack = 0;
 var numberGreen = 0;
 
-const getColor = (number) => {
+
+// user bets $1 each time.
+const processBet = (number) => {
     if (redNumbers.includes(number)) {
         numberRed = numberRed + 1;
+        // We force the user to choose red each time.
+
         return "red";
     } else if (number === 0) {
         numberGreen = numberGreen + 1;
+
         return "green";
     } else {
         numberBlack = numberBlack + 1;
+        houseBank = houseBank + rakeOnLoss * 0.25;
+        pool = pool + rakeOnLoss * 0.25;
+        playerStakeBank = playerStakeBank + rakeOnLoss * 0.5;
+
         return "black";
     }
 }
@@ -90,12 +101,11 @@ const placeBet = () => {
 
     //console.log(prand.uniformIntDistribution(1, 180, rng));
 
-    // const randomValue = Math.floor(Math.random() * 10000000000000000000000000000000000000000000000000000000000000000000000000000);
-    //const randomValue = 46334;
-    const seed = Date.now() ^ (Math.random() * 0x100000000) * Math.random()/Math.random();
-    const rng = prand.xoroshiro128plus(seed);
+    const randomValue = Math.floor(Math.random() * 10000000000000000000000000000000000000000000000000000000000000000000000000000);
 
-    let randomValue = prand.uniformIntDistribution(1, 37, rng)[0];
+    // const seed = Date.now() ^ (Math.random() * 0x100000000) * Math.random()/Math.random();
+    // const rng = prand.xoroshiro128plus(seed);
+    // let randomValue = prand.uniformIntDistribution(1, 37, rng)[0];
 
     let weightedRandom = randomValue % totalOptions;
     let cumulativeWeight = 0;
@@ -105,7 +115,7 @@ const placeBet = () => {
         cumulativeWeight += 1;
         if (weightedRandom < cumulativeWeight) {
             //console.log(weightedRandom, getColor(weightedRandom));
-            getColor(weightedRandom);
+            processBet(weightedRandom);
             break;
         }
     }
@@ -118,5 +128,7 @@ for (var j = 0; j < 10000000; j++) {
 console.log("Red: ", numberRed, " at: ", numberRed/(numberRed+numberGreen+numberBlack),"%");
 console.log("Black: ", numberBlack, " at: ", numberBlack/(numberRed+numberGreen+numberBlack),"%");
 console.log("Green: ", numberGreen, " at: ", numberGreen/(numberRed+numberGreen+numberBlack),"%");
+console.log("Pool Size: ", pool, " Player Stake Bank: ", playerStakeBank," House Bank: ", houseBank);
+console.log("Total Rake %: ", (houseBank + pool + playerStakeBank)/10000000);
 
 

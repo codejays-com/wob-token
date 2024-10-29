@@ -4,7 +4,7 @@ pragma solidity ^0.8.28;
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
-import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
+import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import "./interfaces/IBlast.sol";
 import "./interfaces/IBlastPoints.sol";
 import "./interfaces/IOresToken.sol";
@@ -25,6 +25,9 @@ contract WobMiningAndSmelting is Ownable(msg.sender), ReentrancyGuard {
     uint256 public lastBlockTime;
 
     mapping(uint256 => address[]) public minersPerBlock;  // Miners per block
+    uint256 public minersCurrentBlock = 0;
+    address public currentWinner;
+
     uint256 public blockNumber = 1;  // Starting block number
 
     struct SmeltingEntry {
@@ -39,6 +42,8 @@ contract WobMiningAndSmelting is Ownable(msg.sender), ReentrancyGuard {
     event SmeltingCompleted(address indexed user, uint256 wobAmount);
     event GasFeesClaim(uint256 amount);
 
+    mapping(address => bool) public authorizedContracts;
+
     constructor(IOresToken _oreToken, IERC20 _wobToken) {
         oreToken = _oreToken;
         wobToken = _wobToken;
@@ -48,33 +53,56 @@ contract WobMiningAndSmelting is Ownable(msg.sender), ReentrancyGuard {
     }
 
     // Function to participate in mining
-    function mine() external {
-        minersPerBlock[blockNumber + 1].push(msg.sender);  // Add miner to the next block
+    function mine() external nonReentrant {
+        minersPerBlock[blockNumber + 1].push(msg.sender);  // Add a mine event to the next block
 
-        emit Mine(blockNumber + 1, msg.sender);  // Emit mine event
 
         // Check if the block interval has passed, if so, distribute rewards and start a new block
         if (block.timestamp >= lastBlockTime + blockInterval) {
-            claimGasFees();
+            tryDistributeMiningRewards();
+        }
 
-            // Distribute rewards & gas to the miner
+        minersCurrentBlock++;
+        emit Mine(blockNumber + 1, msg.sender);  // Emit mine event
+    }
+
+    function tryDistributeMiningRewards() internal {
+        if (block.timestamp >= lastBlockTime + blockInterval) {
+            // Select and reward miner
             distributeMiningRewards();
+
             blockNumber++;
+            minersCurrentBlock = 0;
             lastBlockTime = block.timestamp;  // Update block time
         }
     }
 
     // Distribute mining rewards
     function distributeMiningRewards() internal {
-        require(minersPerBlock[blockNumber].length > 0, "No miners for this block");
+        
+        if (minersPerBlock[blockNumber].length > 0) {
+            // Select a random miner to be winner
+            address selectedMiner = _selectRandomMiner();
 
-        // Select a random miner to be winner
-        address selectedMiner = _selectRandomMiner();
+            // Distribute Ore reward to the selected miner
+            // oreToken.mint(selectedMiner, oreMiningReward);
+            currentWinner = selectedMiner;
+            claimGasFees(currentWinner);
 
-        // Distribute Ore reward to the selected miner
-        oreToken.mint(selectedMiner, oreMiningReward);
 
-        emit NewBlock(blockNumber, selectedMiner);  // Emit new block event
+            emit NewBlock(blockNumber, selectedMiner);  // Emit new block event
+        }
+
+        // no miners in previous block, no rewards :)
+        else {
+            //
+
+            // Distribute Ore reward to the selected miner
+            // oreToken.mint(selectedMiner, oreMiningReward);
+
+            emit NewBlock(blockNumber, 0x0000000000000000000000000000000000000000);  // Emit new block event
+        }
+        
     }
 
     // Start the smelting process
@@ -152,14 +180,16 @@ contract WobMiningAndSmelting is Ownable(msg.sender), ReentrancyGuard {
         return minersPerBlock[blockNumber][randomIndex];
     }
 
-    function claimGasFees() public {
-        uint256 oldBalance = address(this).balance;
-        IBlast(0x4300000000000000000000000000000000000002).claimMaxGas(address(this), address(this));
-        emit GasFeesClaim(address(this).balance - oldBalance);
-    }
+    function claimGasFees(address _currentWinner) private {
+        require(currentWinner == _currentWinner, "Not the current Winner");
 
-    function claimAllGas() external onlyOwner {
-        IBlast(0x4300000000000000000000000000000000000002).claimAllGas(address(this), msg.sender);
+        uint256 oldBalance = _currentWinner.balance;
+        IBlast(0x4300000000000000000000000000000000000002).claimMaxGas(address(this), _currentWinner);
+        
+        // after winning, set reset winning address until next winner
+        currentWinner = 0x0000000000000000000000000000000000000000;
+
+        emit GasFeesClaim(_currentWinner.balance - oldBalance);
     }
 
     function readYieldConfiguration() external view returns (uint8) {
