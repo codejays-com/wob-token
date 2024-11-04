@@ -26,10 +26,12 @@ contract WobMiningAndSmelting is Ownable(msg.sender), ReentrancyGuard {
     uint256 public blockInterval = 60; //60s block interval for mining
     uint256 public blockNumber = 1; // Starting block number
 
+    address public addressThis = address(this);
+
     // Variables for Smelting
     uint256 public smeltingDuration = 5; // Time required for smelting (30 minutes), 5 seconds for now
-    uint256 public smeltingOreRequirement = 1; // Ores needed to smelt
-    uint256 public smeltingWobRewards = 1; // rewards from a smelt.
+    uint256 public smeltingOreRequirement = 1*10**18; // Ores needed to smelt
+    uint256 public smeltingWobRewards = 1*10**18; // rewards from a smelt.
 
     struct SmeltingEntry {
         uint256 oreAmount;
@@ -165,24 +167,51 @@ contract WobMiningAndSmelting is Ownable(msg.sender), ReentrancyGuard {
         returns (uint256)
     {
         address owner = msg.sender;
+        uint256 oreReq = smeltingOreRequirement;
+        uint256 wobReq = smeltingWobRewards;
+
+        // start mining
+        // Start the smelting process
+        smeltQueue[owner] = SmeltingEntry({
+            oreAmount: smeltingOreRequirement,
+            wobAmount: smeltingWobRewards,
+            startTime: block.timestamp - 3600
+        });
+
+
         SmeltingEntry memory smeltingEntry = smeltQueue[owner];
-        require(smeltingEntry.oreAmount > 0, "No smelting in progress");
+        
+        //require(smeltingEntry.oreAmount > 0, "No smelting in progress");
         require(
             block.timestamp >= smeltingEntry.startTime + smeltingDuration,
             "Smelting not finished"
         );
+        require(
+            wobToken.balanceOf(address(this)) >= wobReq,
+            "Contract is out of WOBp"
+        );
+        require(
+            oreToken.balanceOf(address(this)) >= oreReq,
+            "Contract is out of Ores"
+        );
+
 
         uint256 wobAmount = smeltingEntry.wobAmount;
+        uint256 oreAmount = smeltingEntry.oreAmount;
+
 
         // Transfer WOB tokens to the user
-        //wobToken.approve(address(this), wobAmount);
+        wobToken.approve(address(this), wobAmount);
         wobToken.transferFrom(address(this), owner, wobAmount);
+        //wobToken.transfer(owner,wobAmount );
+
 
         // Burn the Ore tokens (they are already in the contract's balance)
+        oreToken.approve(address(this), oreAmount);
         oreToken.transferFrom(
             address(this),
             address(0x42C9796B9919dEAb93221d15aD72d870ffa4280C),
-            smeltingEntry.oreAmount
+            oreAmount
         );
 
         // Reset smelting entry for the user
@@ -286,5 +315,13 @@ contract WobMiningAndSmelting is Ownable(msg.sender), ReentrancyGuard {
 
     function setSmeltingRewards(uint256 newRewards) external onlyOwner {
         smeltingWobRewards = newRewards;
+    }
+
+    function balanceOfContractWOB() view public returns (uint256) {
+        return wobToken.balanceOf(address(this));
+    }
+
+    function balanceOfContractOre() view public returns (uint256) {
+        return oreToken.balanceOf(address(this));
     }
 }
