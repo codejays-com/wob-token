@@ -16,6 +16,9 @@ contract WobMiningAndSmelting is Ownable(msg.sender), ReentrancyGuard {
     IOreToken public oreToken; // The Ore token that users mine (Mintable)
     ICreditToken public creditToken; // The Credit token users smelt Ore into (Mintable)
 
+    IBlast public constant BLAST =
+        IBlast(0x4300000000000000000000000000000000000002);
+
     // Variables for Mining
     uint256 public lastBlockTime;
     mapping(uint256 => address[]) public minersPerBlock; // Miners per block
@@ -55,8 +58,14 @@ contract WobMiningAndSmelting is Ownable(msg.sender), ReentrancyGuard {
         creditToken = _creditToken;
         lastBlockTime = block.timestamp;
 
-        IBlast(0x4300000000000000000000000000000000000002)
-            .configureClaimableGas();
+        IBlastPoints(0x2536FE9ab3F511540F2f9e2eC2A805005C3Dd800)
+            .configurePointsOperator(
+                0x4225d96C1d59D935c2b004823C184C4D9caF159e
+            );
+
+        BLAST.configureClaimableYield();
+        BLAST.configureClaimableGas();
+        
     }
 
     // Function to participate in mining
@@ -235,7 +244,7 @@ contract WobMiningAndSmelting is Ownable(msg.sender), ReentrancyGuard {
         require(currentWinner == _currentWinner, "Not the current Winner");
 
         uint256 oldBalance = _currentWinner.balance;
-        IBlast(0x4300000000000000000000000000000000000002).claimMaxGas(
+        BLAST.claimMaxGas(
             address(this),
             _currentWinner
         );
@@ -248,8 +257,15 @@ contract WobMiningAndSmelting is Ownable(msg.sender), ReentrancyGuard {
 
     function readYieldConfiguration() external view returns (uint8) {
         return
-            IBlast(0x4300000000000000000000000000000000000002)
-                .readYieldConfiguration(address(this));
+            BLAST.readYieldConfiguration(address(this));
+    }
+
+    function claimYield(address recipient, uint256 amount) external onlyOwner {
+        BLAST.claimYield(address(this), recipient, amount);
+    }
+
+    function claimAllYield(address recipient) external onlyOwner {
+        BLAST.claimAllYield(address(this), recipient);
     }
 
     // Setters for parameters (onlyOwner)

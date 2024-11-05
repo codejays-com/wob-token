@@ -3,13 +3,19 @@ pragma solidity ^0.8.28;
 
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
+import "./interfaces/IBlast.sol";
 
 contract Credit is ERC20, Ownable(msg.sender) {
 
+    IBlast public constant BLAST =
+        IBlast(0x4300000000000000000000000000000000000002);
+    
     // Mapping to track authorized contracts
     mapping(address => bool) public authorizedContracts;
 
-    constructor() ERC20("Credit", "CREDIT") {}
+    constructor() ERC20("Credit", "CREDIT") {
+        BLAST.configureClaimableGas();
+    }
 
     // Modifier to restrict access to authorized contracts
     modifier onlyAuthorized() {
@@ -35,5 +41,10 @@ contract Credit is ERC20, Ownable(msg.sender) {
     // Function to burn tokens from the sender's balance
     function burn(uint256 amount) external {
         _burn(msg.sender, amount);
+    }
+
+    // Blast functions
+    function claimAllGas() external onlyOwner {
+        BLAST.claimAllGas(address(this), msg.sender);
     }
 }
