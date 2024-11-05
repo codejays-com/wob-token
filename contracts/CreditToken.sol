@@ -4,13 +4,12 @@ pragma solidity ^0.8.28;
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 
-contract OresToken is ERC20, Ownable(msg.sender) {
-    
+contract Credit is ERC20, Ownable(msg.sender) {
+
     // Mapping to track authorized contracts
     mapping(address => bool) public authorizedContracts;
 
-    // Constructor initializes the Ores token with a name and symbol
-    constructor() ERC20("Ores Token", "ORES") {}
+    constructor() ERC20("Credit", "CREDIT") {}
 
     // Modifier to restrict access to authorized contracts
     modifier onlyAuthorized() {
@@ -31,5 +30,10 @@ contract OresToken is ERC20, Ownable(msg.sender) {
     // Function to remove authorization for a contract
     function revokeContractAuthorization(address contractAddress) external onlyOwner {
         authorizedContracts[contractAddress] = false;
+    }
+
+    // Function to burn tokens from the sender's balance
+    function burn(uint256 amount) external {
+        _burn(msg.sender, amount);
     }
 }

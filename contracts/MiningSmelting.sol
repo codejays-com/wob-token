@@ -7,14 +7,14 @@ import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import "./interfaces/IBlast.sol";
 import "./interfaces/IBlastPoints.sol";
-import "./interfaces/IOresToken.sol";
-import "./interfaces/IWOBToken.sol";
+import "./interfaces/IOreToken.sol";
+import "./interfaces/ICreditToken.sol";
 
 contract WobMiningAndSmelting is Ownable(msg.sender), ReentrancyGuard {
     using SafeERC20 for IERC20;
 
-    IOresToken public oreToken; // The Ore token that users mine (Mintable)
-    IERC20 public wobToken; // The WOB token users smelt Ore into
+    IOreToken public oreToken; // The Ore token that users mine (Mintable)
+    ICreditToken public creditToken; // The Credit token users smelt Ore into (Mintable)
 
     // Variables for Mining
     uint256 public lastBlockTime;
@@ -31,11 +31,11 @@ contract WobMiningAndSmelting is Ownable(msg.sender), ReentrancyGuard {
     // Variables for Smelting
     uint256 public smeltingDuration = 5; // Time required for smelting (30 minutes), 5 seconds for now
     uint256 public smeltingOreRequirement = 1*10**18; // Ores needed to smelt
-    uint256 public smeltingWobRewards = 1*10**18; // rewards from a smelt.
+    uint256 public smeltingCreditRewards = 1*10**18; // rewards from a smelt.
 
     struct SmeltingEntry {
         uint256 oreAmount;
-        uint256 wobAmount;
+        uint256 creditAmount;
         uint256 startTime;
     }
 
@@ -45,14 +45,14 @@ contract WobMiningAndSmelting is Ownable(msg.sender), ReentrancyGuard {
     event MineBatch(uint256 indexed blockNumber, address miner, uint256 mineAmount);
     event NewBlock(uint256 blockNumber, address miner);
     event SmeltingStarted(address indexed user, uint256 oreAmount);
-    event SmeltingCompleted(address indexed user, uint256 wobAmount);
+    event SmeltingCompleted(address indexed user, uint256 creditAmount);
     event GasFeesClaim(uint256 amount);
 
     mapping(address => bool) public authorizedContracts;
 
-    constructor(IOresToken _oreToken, IERC20 _wobToken) {
+    constructor(IOreToken _oreToken, ICreditToken _creditToken) {
         oreToken = _oreToken;
-        wobToken = _wobToken;
+        creditToken = _creditToken;
         lastBlockTime = block.timestamp;
 
         IBlast(0x4300000000000000000000000000000000000002)
@@ -151,7 +151,7 @@ contract WobMiningAndSmelting is Ownable(msg.sender), ReentrancyGuard {
         // Start the smelting process
         smeltQueue[owner] = SmeltingEntry({
             oreAmount: smeltingOreRequirement,
-            wobAmount: smeltingWobRewards,
+            creditAmount: smeltingCreditRewards,
             startTime: blockTime
         });
 
@@ -167,17 +167,13 @@ contract WobMiningAndSmelting is Ownable(msg.sender), ReentrancyGuard {
         returns (uint256)
     {
         address owner = msg.sender;
-        uint256 oreReq = smeltingOreRequirement;
-        uint256 wobReq = smeltingWobRewards;
 
-        // start mining
-        // Start the smelting process
-        smeltQueue[owner] = SmeltingEntry({
-            oreAmount: smeltingOreRequirement,
-            wobAmount: smeltingWobRewards,
-            startTime: block.timestamp - 3600
-        });
-
+        // // // start mining for testing.
+        // smeltQueue[owner] = SmeltingEntry({
+        //     oreAmount: smeltingOreRequirement,
+        //     creditAmount: smeltingCreditRewards,
+        //     startTime: block.timestamp - 3600
+        // });
 
         SmeltingEntry memory smeltingEntry = smeltQueue[owner];
         
@@ -187,52 +183,27 @@ contract WobMiningAndSmelting is Ownable(msg.sender), ReentrancyGuard {
             "Smelting not finished"
         );
         require(
-            wobToken.balanceOf(address(this)) >= wobReq,
-            "Contract is out of WOBp"
-        );
-        require(
-            oreToken.balanceOf(address(this)) >= oreReq,
+            oreToken.balanceOf(address(this)) >= smeltingEntry.oreAmount,
             "Contract is out of Ores"
         );
-
-
-        uint256 wobAmount = smeltingEntry.wobAmount;
+       
+        uint256 creditAmount = smeltingEntry.creditAmount;
         uint256 oreAmount = smeltingEntry.oreAmount;
 
-
-        // Transfer WOB tokens to the user
-        wobToken.approve(address(this), wobAmount);
-        wobToken.transferFrom(address(this), owner, wobAmount);
-        //wobToken.transfer(owner,wobAmount );
-
+        // Transfer credit tokens to the user
+        // Distribute Ore reward to the selected miner
+        creditToken.mint(owner, creditAmount);
 
         // Burn the Ore tokens (they are already in the contract's balance)
         oreToken.approve(address(this), oreAmount);
-        oreToken.transferFrom(
-            address(this),
-            address(0x42C9796B9919dEAb93221d15aD72d870ffa4280C),
-            oreAmount
-        );
+        oreToken.burn(oreAmount);
 
         // Reset smelting entry for the user
         delete smeltQueue[owner];
 
-        emit SmeltingCompleted(owner, wobAmount);
+        emit SmeltingCompleted(owner, creditAmount);
 
-        return wobAmount;
-    }
-
-    function wobTokenTransfer(
-        address spender,
-        address receiver,
-        uint256 amount
-    ) external {
-        wobToken.approve(receiver, amount);
-        wobToken.transfer(spender, amount);
-    }
-
-    function oreTokenTransfer(address add, uint256 amount) external {
-        oreToken.transfer(add, amount);
+        return creditAmount;
     }
 
     function smeltQueueDelete(address add) external {
@@ -299,11 +270,11 @@ contract WobMiningAndSmelting is Ownable(msg.sender), ReentrancyGuard {
     }
 
     function updateOreTokenAddress(address newOreToken) external onlyOwner {
-        oreToken = IOresToken(newOreToken);
+        oreToken = IOreToken(newOreToken);
     }
 
-    function updateWobTokenAddress(address newWobToken) external onlyOwner {
-        wobToken = IERC20(newWobToken);
+    function updateCreditTokenAddress(address newCreditToken) external onlyOwner {
+        creditToken = ICreditToken(newCreditToken);
     }
 
     function setSmeltingRequirement(uint256 newOreRequirement)
@@ -314,11 +285,11 @@ contract WobMiningAndSmelting is Ownable(msg.sender), ReentrancyGuard {
     }
 
     function setSmeltingRewards(uint256 newRewards) external onlyOwner {
-        smeltingWobRewards = newRewards;
+        smeltingCreditRewards = newRewards;
     }
 
-    function balanceOfContractWOB() view public returns (uint256) {
-        return wobToken.balanceOf(address(this));
+    function balanceOfContractCredits() view public returns (uint256) {
+        return creditToken.balanceOf(address(this));
     }
 
     function balanceOfContractOre() view public returns (uint256) {
