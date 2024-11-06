@@ -135,12 +135,12 @@ contract WobMiningAndSmelting is Ownable(msg.sender), ReentrancyGuard {
     function startSmelting() external nonReentrant returns (uint256[2] memory) {
         address owner = msg.sender;
         require(
-            oreToken.balanceOf(msg.sender) >= smeltingOreRequirement,
+            oreToken.balanceOf(owner) >= smeltingOreRequirement,
             "Insufficient Ores balance"
         );
         require(
             oreToken.transferFrom(
-                msg.sender,
+                owner,
                 address(this),
                 smeltingOreRequirement
             ),
@@ -176,13 +176,6 @@ contract WobMiningAndSmelting is Ownable(msg.sender), ReentrancyGuard {
         returns (uint256)
     {
         address owner = msg.sender;
-
-        // // // start mining for testing.
-        // smeltQueue[owner] = SmeltingEntry({
-        //     oreAmount: smeltingOreRequirement,
-        //     creditAmount: smeltingCreditRewards,
-        //     startTime: block.timestamp - 3600
-        // });
 
         SmeltingEntry memory smeltingEntry = smeltQueue[owner];
         
