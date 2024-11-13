@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MIT
+// SPDX-License-Identifier: NONE
 pragma solidity ^0.8.28;
 
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
@@ -10,7 +10,7 @@ import "./interfaces/IBlastPoints.sol";
 import "./interfaces/IOreToken.sol";
 import "./interfaces/ICreditToken.sol";
 
-contract WobMiningAndSmelting is Ownable(msg.sender), ReentrancyGuard {
+contract WobMiningAndSmelting is Ownable, ReentrancyGuard {
     using SafeERC20 for IERC20;
 
     IOreToken public oreToken; // The Ore token that users mine (Mintable)
@@ -24,17 +24,16 @@ contract WobMiningAndSmelting is Ownable(msg.sender), ReentrancyGuard {
     mapping(uint256 => address[]) public minersPerBlock; // Miners per block
     uint256 public minersCurrentBlock = 0;
     address public currentWinner;
-    uint256 public oreMiningReward = 50 * 10**18; // 50 Ore tokens per block
-    uint256 public txFee = 1 * 10**16;
-    uint256 public blockInterval = 60; //60s block interval for mining
+    uint256 public oreMiningReward = 500 * 10**18; // 500 Ore tokens per block
+    uint256 public blockInterval = 900; // 15mins block interval for mining
     uint256 public blockNumber = 1; // Starting block number
 
     address public addressThis = address(this);
 
     // Variables for Smelting
-    uint256 public smeltingDuration = 5; // Time required for smelting (30 minutes), 5 seconds for now
-    uint256 public smeltingOreRequirement = 1*10**18; // Ores needed to smelt
-    uint256 public smeltingCreditRewards = 1*10**18; // rewards from a smelt.
+    uint256 public smeltingDuration = 1800; // Time required for smelting (30 minutes), 5 seconds for now
+    uint256 public smeltingOreRequirement = 200*10**18; // Ores needed to smelt
+    uint256 public smeltingCreditRewards = 200*10**18; // Credit rewards from a smelt.
 
     struct SmeltingEntry {
         uint256 oreAmount;
@@ -46,14 +45,14 @@ contract WobMiningAndSmelting is Ownable(msg.sender), ReentrancyGuard {
 
     event Mine(uint256 indexed blockNumber, address miner);
     event MineBatch(uint256 indexed blockNumber, address miner, uint256 mineAmount);
-    event NewBlock(uint256 blockNumber, address miner);
+    event NewBlockFound(address miner, uint256 blockNumber);
     event SmeltingStarted(address indexed user, uint256 oreAmount);
     event SmeltingCompleted(address indexed user, uint256 creditAmount);
-    event GasFeesClaim(uint256 amount);
+    event BlockWonBy(address miner, uint256 amount);
 
     mapping(address => bool) public authorizedContracts;
 
-    constructor(IOreToken _oreToken, ICreditToken _creditToken) {
+    constructor(IOreToken _oreToken, ICreditToken _creditToken) Ownable(msg.sender) {
         oreToken = _oreToken;
         creditToken = _creditToken;
         lastBlockTime = block.timestamp;
@@ -65,7 +64,6 @@ contract WobMiningAndSmelting is Ownable(msg.sender), ReentrancyGuard {
 
         BLAST.configureClaimableYield();
         BLAST.configureClaimableGas();
-        
     }
 
     // Function to participate in mining
@@ -121,12 +119,12 @@ contract WobMiningAndSmelting is Ownable(msg.sender), ReentrancyGuard {
             currentWinner = selectedMiner;
             claimGasFees(currentWinner);
 
-            emit NewBlock(blockNumber, selectedMiner); // Emit new block event
+            emit NewBlockFound(selectedMiner, blockNumber); // Emit new block event
         } else {
             // no miners in previous block, no rewards :)
-            emit NewBlock(
-                blockNumber,
-                0x0000000000000000000000000000000000000000
+            emit NewBlockFound(
+                0x0000000000000000000000000000000000000000,
+                blockNumber
             ); // Emit new block event
         }
     }
@@ -153,9 +151,6 @@ contract WobMiningAndSmelting is Ownable(msg.sender), ReentrancyGuard {
         );
 
         uint256 blockTime = block.timestamp;
-
-        // Transfer Ore tokens from the user to the contract
-        oreToken.transferFrom(owner, address(this), smeltingOreRequirement);
 
         // Start the smelting process
         smeltQueue[owner] = SmeltingEntry({
@@ -242,10 +237,11 @@ contract WobMiningAndSmelting is Ownable(msg.sender), ReentrancyGuard {
             _currentWinner
         );
 
+        emit BlockWonBy(_currentWinner, _currentWinner.balance - oldBalance);
+
         // after winning, set reset winning address until next winner
         currentWinner = 0x0000000000000000000000000000000000000000;
 
-        emit GasFeesClaim(_currentWinner.balance - oldBalance);
     }
 
     function readYieldConfiguration() external view returns (uint8) {
@@ -264,10 +260,6 @@ contract WobMiningAndSmelting is Ownable(msg.sender), ReentrancyGuard {
     // Setters for parameters (onlyOwner)
     function setOreMiningReward(uint256 newReward) external onlyOwner {
         oreMiningReward = newReward;
-    }
-
-    function setTxFee(uint256 newFee) external onlyOwner {
-        txFee = newFee;
     }
 
     function setBlockInterval(uint256 newInterval) external onlyOwner {
