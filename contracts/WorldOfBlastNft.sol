@@ -79,7 +79,7 @@ contract WorldOfBlastNft is
     string public _contractURI;
 
     mapping(uint256 => Item) private items;
-    mapping(address => bool) public creators;
+    mapping(address => bool) private creators;
     mapping(address => mapping(uint256 => bool))
     public authorizedContractsByItem;
 
