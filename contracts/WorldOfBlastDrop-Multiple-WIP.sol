@@ -53,8 +53,8 @@ contract WorldOfBlastDrop is Ownable {
         string contractType; // "nft" or "token"
     }
 
-    uint256 public nftContracts;
-    uint256 public tokenContracts;
+    uint256 public numberOfNFTContracts;
+    uint256 public numberOfTokenContracts;
 
     tokenObject[] private tokenObjectsArray;
     nftObject[] private nftObjectsArray;
@@ -73,7 +73,7 @@ contract WorldOfBlastDrop is Ownable {
         uint256 _rate,
         uint256[8] memory _weights,
         uint256[8] memory _multipliers
-    ) public {
+    )  external onlyOwner {
         require(_weights.length <= 8, "Weights exceed max size");
         require(_multipliers.length <= 8, "Multipliers exceed max size");
 
@@ -86,23 +86,23 @@ contract WorldOfBlastDrop is Ownable {
             multipliers: _multipliers
         });
         tokenObjectsArray.push(newTokenObject);
-        emit tokenAdded(_addr, tokenContracts);
-        tokenContracts = tokenContracts + 1;
+        emit tokenAdded(_addr, numberOfTokenContracts);
+        numberOfTokenContracts = numberOfTokenContracts + 1;
     }
 
     function addNewNFT(
         string memory _name,
         address _addr,
         uint256 _prob
-    ) public {
+    )  external onlyOwner {
         nftObject memory newNFTObject = nftObject({
             name: _name,
             addr: _addr,
             prob: _prob
         });
         nftObjectsArray.push(newNFTObject);
-        emit nftAdded(_addr, nftContracts);
-        nftContracts = nftContracts + 1;
+        emit nftAdded(_addr, numberOfNFTContracts);
+        numberOfNFTContracts = numberOfNFTContracts + 1;
     }
 
     function updateTokenWeightsPosition(
@@ -138,6 +138,7 @@ contract WorldOfBlastDrop is Ownable {
 
         // Remove the last element (now duplicated)
         tokenObjectsArray.pop();
+        numberOfTokenContracts = numberOfTokenContracts - 1;
     }
 
     function updateNFTProb(uint256 index, uint256 prob) external onlyOwner {
@@ -155,6 +156,7 @@ contract WorldOfBlastDrop is Ownable {
 
         // Remove the last element (now duplicated)
         nftObjectsArray.pop();
+        numberOfNFTContracts = numberOfNFTContracts - 1;
     }
 
     event tokenDrop(
@@ -179,8 +181,8 @@ contract WorldOfBlastDrop is Ownable {
         BLAST.configureClaimableYield();
         BLAST.configureClaimableGas();
 
-        tokenContracts = 0;
-        nftContracts = 0;
+        numberOfTokenContracts = 0;
+        numberOfNFTContracts = 0;
     }
 
     modifier onlyAuthorizedContract() {
@@ -236,6 +238,7 @@ contract WorldOfBlastDrop is Ownable {
     ) internal {
         tokenObject memory token = tokenObjectsArray[index];
         uint256 totalResult = token.rate * damage;
+        bool hasMultiplier = false;
 
         // Initialize reward struct to prevent too deep cals.
         TokenReward memory reward;
@@ -248,11 +251,12 @@ contract WorldOfBlastDrop is Ownable {
             reward.cumulativeWeight += token.weights[j];
             if (reward.weightedRandom < reward.cumulativeWeight) {
                 reward.multiplier = token.multipliers[j];
+                hasMultiplier = true;
                 break;
             }
         }
 
-        require(reward.multiplier > 0, "No multipliers found");
+        require(hasMultiplier = true, "No multipliers found");
 
         uint256 deliveryEarns = (totalResult * reward.multiplier) / 100;
         uint256 currentBalance = IERC20(token.addr).balanceOf(address(this));
