@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
 
 import "@openzeppelin/contracts/token/ERC721/IERC721.sol";
@@ -112,6 +113,7 @@ contract WorldOfBlastGame is Ownable, ReentrancyGuard {
     );
 
     event EntropyRequested(uint256 sequenceNumber);
+    event EntropyResult(uint256 sequenceNumber, bytes32 randomNumber);
 
     address public contractDropAddress;
     bool public paused;
@@ -349,8 +351,6 @@ contract WorldOfBlastGame is Ownable, ReentrancyGuard {
             monster.name
         );
 
-        emit EntropyRequested(huntCount);
-
         return huntCount;
     }
 
@@ -359,15 +359,24 @@ contract WorldOfBlastGame is Ownable, ReentrancyGuard {
             hunts[huntId].hunter == msg.sender,
             "Not the hunter of this hunt"
         );
-
         require(hunts[huntId].endTime == 0, "Hunt already ended");
 
+        emit EntropyRequested(huntId);
+    }
+
+    function finalizeHunt(
+        uint256 huntId,
+        bytes32 randomNumber
+    ) public onlyRngAdmin {
+        emit EntropyResult(huntId, randomNumber);
+
+        address hunter = hunts[huntId].hunter;
+
         hunts[huntId].endTime = block.timestamp;
-        huntStartTimes[msg.sender] = 0;
-        activeHuntId[msg.sender] = 0;
+        huntStartTimes[hunter] = 0;
+        activeHuntId[hunter] = 0;
 
         address _nftContract = hunts[huntId].nftContract;
-        bytes32 randomBytes = huntEntropy[huntId];
 
         IExtendedERC721 nft = IExtendedERC721(_nftContract);
 
@@ -406,21 +415,14 @@ contract WorldOfBlastGame is Ownable, ReentrancyGuard {
         );
 
         worldOfBlastDrop.handleTokenEarnings(
-            msg.sender,
+            hunter,
             effectiveHitCounter * weaponToken.damage,
-            randomBytes
+            randomNumber
         );
     }
 
     function setRngAdmin(address _rngAdmin) public onlyOwner {
         require(_rngAdmin != address(0), "Invalid address for rngAdmin");
         rngAdmin = _rngAdmin;
-    }
-
-    function setRandomData(
-        uint256 sequenceNumber,
-        bytes32 randomNumber
-    ) public onlyRngAdmin {
-        huntEntropy[sequenceNumber] = randomNumber;
     }
 }
