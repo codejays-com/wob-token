@@ -6,19 +6,6 @@ import "@openzeppelin/contracts/access/Ownable.sol";
 import "./interfaces/IBlast.sol";
 import "./interfaces/IBlastPoints.sol";
 
-interface IERC20Rebasing {
-    function configure(YieldMode _mode) external returns (uint256);
-
-    function claim(address recipient, uint256 amount)
-        external
-        returns (uint256);
-
-    function getClaimableAmount(address account)
-        external
-        view
-        returns (uint256);
-}
-
 interface WorldOfBlastNft {
     function restoreNFT(uint256 tokenId) external;
 }
@@ -76,14 +63,7 @@ contract WorldOfBlastDrop is Ownable {
     IBlast public constant BLAST =
         IBlast(0x4300000000000000000000000000000000000002);
 
-    address public WETH_ADDDRES = 0x4300000000000000000000000000000000000004;
     address public CONTRACT_NFT = 0xFB7acDaE5B59e9C3337203830aEC1563316679E6;
-
-    IERC20Rebasing public constant USDB =
-        IERC20Rebasing(0x4300000000000000000000000000000000000003);
-
-    IERC20Rebasing public constant WETH =
-        IERC20Rebasing(0x4300000000000000000000000000000000000004);
 
     // Add a new object to the array
     function addNewToken(
@@ -193,18 +173,11 @@ contract WorldOfBlastDrop is Ownable {
 
         IBlastPoints(0x2536FE9ab3F511540F2f9e2eC2A805005C3Dd800)
             .configurePointsOperator(
-                0x4225d96C1d59D935c2b004823C184C4D9caF159e
+                0x2FBc1E8A617e59e8D1384eF13B621e9D1cf5Da5B
             );
 
         BLAST.configureClaimableYield();
         BLAST.configureClaimableGas();
-
-        USDB.configure(YieldMode.CLAIMABLE);
-        WETH.configure(YieldMode.CLAIMABLE);
-
-        // for (uint256 i = 0; i < weights.length; i++) {
-        //     totalWeight += weights[i];
-        // }
 
         tokenContracts = 0;
         nftContracts = 0;
@@ -378,59 +351,9 @@ contract WorldOfBlastDrop is Ownable {
         BLAST.claimAllGas(address(this), msg.sender);
     }
 
-    function claimYieldTokens(address _recipient, uint256 _amount)
-        external
-        onlyOwner
-        returns (uint256, uint256)
-    {
-        return (
-            USDB.claim(_recipient, _amount),
-            WETH.claim(_recipient, _amount)
-        );
-    }
-
-    function getClaimableAmount(address _account)
-        external
-        view
-        returns (uint256, uint256)
-    {
-        return (
-            USDB.getClaimableAmount(_account),
-            WETH.getClaimableAmount(_account)
-        );
-    }
-
     function updatePointsOperator(address _newOperator) external onlyOwner {
         IBlastPoints(0x2536FE9ab3F511540F2f9e2eC2A805005C3Dd800)
             .configurePointsOperatorOnBehalf(address(this), _newOperator);
-    }
-
-    function configureClaimableYieldOnBehalf() external onlyOwner {
-        BLAST.configureClaimableYieldOnBehalf(address(this));
-    }
-
-    function configureAutomaticYieldOnBehalf() external onlyOwner {
-        BLAST.configureAutomaticYieldOnBehalf(address(this));
-    }
-
-    function configureVoidYield() external onlyOwner {
-        BLAST.configureVoidYield();
-    }
-
-    function configureVoidYieldOnBehalf() external onlyOwner {
-        BLAST.configureVoidYieldOnBehalf(address(this));
-    }
-
-    function configureClaimableGasOnBehalf() external onlyOwner {
-        BLAST.configureClaimableGasOnBehalf(address(this));
-    }
-
-    function configureVoidGas() external onlyOwner {
-        BLAST.configureVoidGas();
-    }
-
-    function configureVoidGasOnBehalf() external onlyOwner {
-        BLAST.configureVoidGasOnBehalf(address(this));
     }
 
     function claimYield(address recipient, uint256 amount) external onlyOwner {
@@ -454,19 +377,6 @@ contract WorldOfBlastDrop is Ownable {
 
     function claimMaxGas(address recipientOfGas) external onlyOwner {
         BLAST.claimMaxGas(address(this), recipientOfGas);
-    }
-
-    function claimGas(
-        address recipientOfGas,
-        uint256 gasToClaim,
-        uint256 gasSecondsToConsume
-    ) external onlyOwner {
-        BLAST.claimGas(
-            address(this),
-            recipientOfGas,
-            gasToClaim,
-            gasSecondsToConsume
-        );
     }
 
     function readClaimableYield() external view returns (uint256) {
