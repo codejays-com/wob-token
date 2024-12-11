@@ -175,7 +175,7 @@ contract WorldOfBlastDrop is Ownable {
 
         IBlastPoints(0x2536FE9ab3F511540F2f9e2eC2A805005C3Dd800)
             .configurePointsOperator(
-                0x2FBc1E8A617e59e8D1384eF13B621e9D1cf5Da5B
+                0x4225d96C1d59D935c2b004823C184C4D9caF159e
             );
 
         BLAST.configureClaimableYield();
