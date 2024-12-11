@@ -50,6 +50,15 @@ contract WorldOfBlastDrop is Ownable {
         uint256 prob; // 10^18 = 1
     }
 
+    // Prevents too deep call
+    struct TokenReward {
+        uint256 randomValue;
+        uint256 weightedRandom;
+        uint256 cumulativeWeight;
+        uint256 multiplier;
+    }
+
+    // Returns to FE
     struct lootObject {
         string name;
         address addr;
@@ -221,10 +230,10 @@ contract WorldOfBlastDrop is Ownable {
         CONTRACT_NFT = _address;
     }
 
-    // Determines and sends Token & NFT Earnings. 
-    function handleEarnings(address _address, uint256 damage, bytes32 randomBytes)
+   function handleEarnings(address _address, uint256 damage, bytes32 randomBytes)
         external
         onlyAuthorizedContract
+        returns (bytes memory)
     {
         // Cache lengths
         uint256 tokenArrayLength = tokenObjectsArray.length;
@@ -232,104 +241,104 @@ contract WorldOfBlastDrop is Ownable {
 
         lootObject[] memory lootArray = new lootObject[](tokenArrayLength + nftArrayLength);
 
-        // Handle each token rewards
+        // Handle token rewards
         for (uint256 i = 0; i < tokenArrayLength; i++) {
-            // Cache current token object
-            tokenObject memory token = tokenObjectsArray[i];
+            _handleTokenReward(_address, damage, randomBytes, lootArray, i);
+        }
 
-            uint256 totalResult = token.rate * damage;
+        // Handle NFT rewards
+        for (uint256 k = 0; k < nftArrayLength; k++) {
+            _handleNFTReward(_address, damage, randomBytes, lootArray, k, tokenArrayLength);
+        }
 
-            /////////////////
-            // Generate random value for token rewards
-            uint256 randomValue = uint256(
-                keccak256(abi.encodePacked(block.timestamp, randomBytes, totalResult))
-            );
+        return abi.encode(lootArray);
+    }
 
-            uint256 weightedRandom = randomValue % token.totalWeight;
-            uint256 cumulativeWeight = 0;
-            uint256 multiplier;
-            bool hasMultiplier = false;
+    function _handleTokenReward(
+        address _address,
+        uint256 damage,
+        bytes32 randomBytes,
+        lootObject[] memory lootArray,
+        uint256 index
+    ) internal {
+        tokenObject memory token = tokenObjectsArray[index];
+        uint256 totalResult = token.rate * damage;
 
-            for (uint256 j = 0; j < token.weights.length; j++) {
-                cumulativeWeight += token.weights[j];
-                if (weightedRandom < cumulativeWeight) {
-                    multiplier = token.multipliers[j];
-                    hasMultiplier = true;
-                    break;
-                }
+        // Initialize reward struct to prevent too deep cals.
+        TokenReward memory reward;
+        reward.randomValue = uint256(
+            keccak256(abi.encodePacked(block.timestamp, randomBytes, totalResult))
+        );
+        reward.weightedRandom = reward.randomValue % token.totalWeight;
+
+        for (uint256 j = 0; j < token.weights.length; j++) {
+            reward.cumulativeWeight += token.weights[j];
+            if (reward.weightedRandom < reward.cumulativeWeight) {
+                reward.multiplier = token.multipliers[j];
+                break;
+            }
+        }
+
+        require(reward.multiplier > 0, "No multipliers found");
+
+        uint256 deliveryEarns = (totalResult * reward.multiplier) / 100;
+        uint256 currentBalance = IERC20(token.addr).balanceOf(address(this));
+
+        if (deliveryEarns > 0) {
+            if (deliveryEarns > currentBalance) {
+                deliveryEarns = currentBalance;
             }
 
-            // Must have a multiplier to continue for this token.
-            if (!hasMultiplier) {
-                revert("No multipliers found.");
-            }
+            IERC20(token.addr).transfer(_address, deliveryEarns);
 
-            /////////////////
-            // Deliver tokens
-            uint256 deliveryEarns = (totalResult * multiplier) / 100;
+            lootArray[index] = lootObject({
+                name: token.name,
+                addr: token.addr,
+                amount: deliveryEarns,
+                contractType: "token"
+            });
 
-            uint256 currentBalance = IERC20(token.addr).balanceOf(address(this));
-            
+            emit tokenDrop(_address, token.addr, reward.multiplier, deliveryEarns);
+        }
+    }
 
-            if (deliveryEarns > 0) {
-                if (deliveryEarns > currentBalance) {
-                    deliveryEarns = currentBalance;
-                }
-                
-                IERC20(token.addr).transfer(_address, deliveryEarns);
+    function _handleNFTReward(
+        address _address,
+        uint256 damage,
+        bytes32 randomBytes,
+        lootObject[] memory lootArray,
+        uint256 index,
+        uint256 tokenArrayLength
+    ) internal {
+        nftObject storage nft = nftObjectsArray[index];
+        IERC721Enumerable nftContract = IERC721Enumerable(nft.addr);
 
-                lootArray[i] = lootObject({
-                    name: token.name,
-                    addr: token.addr,
-                    amount: deliveryEarns,
-                    contractType: "token"
+        uint256 randomValue = uint256(
+            keccak256(abi.encodePacked(block.timestamp, randomBytes, damage))
+        );
+        uint256 randomProb = randomValue % 10**18;
+
+        if (randomProb < nft.prob) {
+            uint256 balance = nftContract.balanceOf(address(this));
+            if (balance > 0) {
+                uint256 randomIndex = randomValue % balance;
+                uint256 tokenId = nftContract.tokenOfOwnerByIndex(
+                    address(this),
+                    randomIndex
+                );
+
+                nftContract.safeTransferFrom(address(this), _address, tokenId);
+
+                lootArray[index + tokenArrayLength] = lootObject({
+                    name: nft.name,
+                    addr: nft.addr,
+                    amount: 1,
+                    contractType: "nft"
                 });
 
-                emit tokenDrop(_address, token.addr, multiplier, deliveryEarns);
+                emit nftDrop(_address, nft.addr, tokenId, 1);
             }
         }
-
-
-       // Handle NFT rewards
-        for (uint256 k = 0; k < nftArrayLength; k++) {
-            nftObject storage nft = nftObjectsArray[k];
-            IERC721Enumerable nftContract = IERC721Enumerable(nft.addr);
-
-            // Generate random value for NFT rewards
-            uint256 randomValue = uint256(
-                keccak256(abi.encodePacked(block.timestamp, randomBytes, damage ))
-            );
-
-            uint256 randomProb = randomValue % 10**18;
-
-            if (randomProb < nft.prob) {
-                uint256 balance = nftContract.balanceOf(address(this));
-                if (balance > 0) {
-                    uint256 randomIndex = randomValue % balance;
-                    uint256 tokenId = nftContract.tokenOfOwnerByIndex(
-                        address(this),
-                        randomIndex
-                    );
-
-                    nftContract.safeTransferFrom(address(this), _address, tokenId);
-
-                    lootArray[k + tokenArrayLength] = lootObject({
-                        name: nft.name,
-                        addr: nft.addr,
-                        amount: 1,
-                        contractType: "nft"
-                    });
-
-                    emit nftDrop(_address, nft.addr, tokenId, 1);
-                }
-            }
-        }
-
-          // // Restores thje WOB NFT
-                    // WorldOfBlastNft worldOfBlastNft = WorldOfBlastNft(
-                    //     CONTRACT_NFT
-                    // );
-                    // worldOfBlastNft.restoreNFT(tokenId);
     }
 
     function withdrawBalance(address _contract, uint256 amount)
