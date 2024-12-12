@@ -91,6 +91,7 @@ contract WorldOfBlastGame is Ownable, ReentrancyGuard {
     mapping(address => bool) public authorizedNFTContracts;
     mapping(address => mapping(uint256 => bool)) public nftInHunt;
     mapping(uint256 => bytes32) private huntEntropy;
+    mapping(uint256 => bool) private huntResolved;
 
     mapping(uint256 => Hunt) public hunts;
 
@@ -340,6 +341,7 @@ contract WorldOfBlastGame is Ownable, ReentrancyGuard {
         huntStartTimes[msg.sender] = block.timestamp;
 
         nftInHunt[nftContract][nftId] = true;
+        huntResolved[huntCount] = false;
 
         emit HuntHasBegun(
             huntCount,
@@ -360,6 +362,7 @@ contract WorldOfBlastGame is Ownable, ReentrancyGuard {
             "Not the hunter of this hunt"
         );
         require(hunts[huntId].endTime == 0, "Hunt already ended");
+        require(!huntResolved[huntId], "Hunt already ended");
 
         emit EntropyRequested(huntId);
     }
@@ -368,6 +371,9 @@ contract WorldOfBlastGame is Ownable, ReentrancyGuard {
         uint256 huntId,
         bytes32 randomNumber
     ) public onlyRngAdmin {
+        require(!huntResolved[huntId], "Hunt already ended");
+        huntResolved[huntId] = true;
+
         emit EntropyResult(huntId, randomNumber);
 
         address hunter = hunts[huntId].hunter;
