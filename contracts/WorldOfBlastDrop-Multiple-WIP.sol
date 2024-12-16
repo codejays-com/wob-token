@@ -169,13 +169,22 @@ contract WorldOfBlastDrop is Ownable {
         nftObjectsArray[index].prob = prob;
     }
 
-    function updateNFTidPositions (uint256 nftObjectIndex, uint256 idIndex, uint256 idNFT) external onlyOwner {
+    function updateNFTIdPosition (uint256 nftObjectIndex, uint256 idIndex, uint256 idNFT) external onlyOwner {
         require(nftObjectIndex < nftObjectsArray.length, "nftObjectIndex is out of bounds");
         require(idIndex < nftObjectsArray[nftObjectIndex].ids.length, "idIndex is out of bounds");
 
         nftObjectsArray[nftObjectIndex].ids[idIndex] = idNFT;
     }
+    
+    // resets nft when looted.
+    function resetNFTIdPosition (uint256 nftObjectIndex, uint256 idIndex) internal {
+        require(nftObjectIndex < nftObjectsArray.length, "nftObjectIndex is out of bounds");
+        require(idIndex < nftObjectsArray[nftObjectIndex].ids.length, "idIndex is out of bounds");
 
+        // 0 is empty
+        nftObjectsArray[nftObjectIndex].ids[idIndex] = 0;
+    }
+    
     function getNFTObject(uint256 nftObjectsArrayId) 
         external 
         view 
@@ -363,6 +372,8 @@ contract WorldOfBlastDrop is Ownable {
                     
                     // We set randomIndex index NFT as transfer because it exists. randomIndex contains NFT
                     nftContract.safeTransferFrom(address(this), _address, chosenNFTId);
+                    // sets as 0
+                    resetNFTIdPosition (index, chosenNFTId);
 
                     lootArray[index + tokenArrayLength] = lootObject({
                         name: nft.name,
