@@ -11,10 +11,10 @@ interface WorldOfBlastNft {
 }
 
 interface IERC721Enumerable is IERC721, WorldOfBlastNft {
-    function tokenOfOwnerByIndex(address owner, uint256 index)
-        external
-        view
-        returns (uint256);
+    function tokenOfOwnerByIndex(
+        address owner,
+        uint256 index
+    ) external view returns (uint256);
 }
 
 contract WorldOfBlastDrop is Ownable {
@@ -76,9 +76,9 @@ contract WorldOfBlastDrop is Ownable {
         uint256 _rate,
         uint256[12] memory _weights,
         uint256[12] memory _multipliers
-    )  external onlyOwner {
-        require(_weights.length <= 8, "Weights exceed max size");
-        require(_multipliers.length <= 8, "Multipliers exceed max size");
+    ) external onlyOwner {
+        require(_weights.length <= 12, "Weights exceed max size");
+        require(_multipliers.length <= 12, "Multipliers exceed max size");
 
         tokenObject memory newTokenObject = tokenObject({
             name: _name,
@@ -98,7 +98,7 @@ contract WorldOfBlastDrop is Ownable {
         address _addr,
         uint256 _prob,
         uint256[30] memory _ids
-    )  external onlyOwner {
+    ) external onlyOwner {
         nftObject memory newNFTObject = nftObject({
             name: _name,
             addr: _addr,
@@ -134,15 +134,34 @@ contract WorldOfBlastDrop is Ownable {
         tokenObjectsArray[index].rate = rate;
     }
 
-    function getTokenObject(uint256 tokenObjectsArrayId) 
-        external 
-        view 
-        onlyOwner 
-        returns (string memory name, address addr, uint256 totalWeight, uint256 rate, uint256[12] memory weights, uint256[12] memory multipliers) 
+    function getTokenObject(
+        uint256 tokenObjectsArrayId
+    )
+        external
+        view
+        onlyOwner
+        returns (
+            string memory name,
+            address addr,
+            uint256 totalWeight,
+            uint256 rate,
+            uint256[12] memory weights,
+            uint256[12] memory multipliers
+        )
     {
-        require(tokenObjectsArrayId < tokenObjectsArray.length, "Index out of bounds");
+        require(
+            tokenObjectsArrayId < tokenObjectsArray.length,
+            "Index out of bounds"
+        );
         tokenObject storage tokenObj = tokenObjectsArray[tokenObjectsArrayId];
-        return (tokenObj.name, tokenObj.addr, tokenObj.totalWeight, tokenObj.rate, tokenObj.weights, tokenObj.multipliers);
+        return (
+            tokenObj.name,
+            tokenObj.addr,
+            tokenObj.totalWeight,
+            tokenObj.rate,
+            tokenObj.weights,
+            tokenObj.multipliers
+        );
     }
 
     function deleteTokenObject(uint256 index) external onlyOwner {
@@ -169,29 +188,58 @@ contract WorldOfBlastDrop is Ownable {
         nftObjectsArray[index].prob = prob;
     }
 
-    function updateNFTIdPosition (uint256 nftObjectIndex, uint256 idIndex, uint256 idNFT) external onlyOwner {
-        require(nftObjectIndex < nftObjectsArray.length, "nftObjectIndex is out of bounds");
-        require(idIndex < nftObjectsArray[nftObjectIndex].ids.length, "idIndex is out of bounds");
+    function updateNFTIdPosition(
+        uint256 nftObjectIndex,
+        uint256 idIndex,
+        uint256 idNFT
+    ) external onlyOwner {
+        require(
+            nftObjectIndex < nftObjectsArray.length,
+            "nftObjectIndex is out of bounds"
+        );
+        require(
+            idIndex < nftObjectsArray[nftObjectIndex].ids.length,
+            "idIndex is out of bounds"
+        );
 
         nftObjectsArray[nftObjectIndex].ids[idIndex] = idNFT;
     }
-    
+
     // resets nft when looted.
-    function resetNFTIdPosition (uint256 nftObjectIndex, uint256 idIndex) internal {
-        require(nftObjectIndex < nftObjectsArray.length, "nftObjectIndex is out of bounds");
-        require(idIndex < nftObjectsArray[nftObjectIndex].ids.length, "idIndex is out of bounds");
+    function resetNFTIdPosition(
+        uint256 nftObjectIndex,
+        uint256 idIndex
+    ) internal {
+        require(
+            nftObjectIndex < nftObjectsArray.length,
+            "nftObjectIndex is out of bounds"
+        );
+        require(
+            idIndex < nftObjectsArray[nftObjectIndex].ids.length,
+            "idIndex is out of bounds"
+        );
 
         // 0 is empty
         nftObjectsArray[nftObjectIndex].ids[idIndex] = 0;
     }
-    
-    function getNFTObject(uint256 nftObjectsArrayId) 
-        external 
-        view 
-        onlyOwner 
-        returns (string memory name, address addr, uint256 prob, uint256[30] memory ids) 
+
+    function getNFTObject(
+        uint256 nftObjectsArrayId
+    )
+        external
+        view
+        onlyOwner
+        returns (
+            string memory name,
+            address addr,
+            uint256 prob,
+            uint256[30] memory ids
+        )
     {
-        require(nftObjectsArrayId < nftObjectsArray.length, "Index out of bounds");
+        require(
+            nftObjectsArrayId < nftObjectsArray.length,
+            "Index out of bounds"
+        );
         nftObject storage nftObj = nftObjectsArray[nftObjectsArrayId];
         return (nftObj.name, nftObj.addr, nftObj.prob, nftObj.ids);
     }
@@ -226,7 +274,6 @@ contract WorldOfBlastDrop is Ownable {
     event tokenRemoved(address token, string name);
     event nftRemoved(address nft, string name);
 
-
     constructor() Ownable(msg.sender) {
         authorizedToUseContract[msg.sender] = true;
 
@@ -250,10 +297,10 @@ contract WorldOfBlastDrop is Ownable {
         _;
     }
 
-    function authorizeContract(address contractAddress, bool authorized)
-        external
-        onlyAuthorizedContract
-    {
+    function authorizeContract(
+        address contractAddress,
+        bool authorized
+    ) external onlyAuthorizedContract {
         authorizedToUseContract[contractAddress] = authorized;
     }
 
@@ -263,16 +310,18 @@ contract WorldOfBlastDrop is Ownable {
     }
 
     // Sends rewards to _address, and handles some random.
-    function handleEarnings(address _address, uint256 damage, bytes32 randomBytes)
-        external
-        onlyAuthorizedContract
-        returns (bytes memory)
-    {
+    function handleEarnings(
+        address _address,
+        uint256 damage,
+        bytes32 randomBytes
+    ) external onlyAuthorizedContract returns (bytes memory) {
         // Cache lengths
         uint256 tokenArrayLength = tokenObjectsArray.length;
         uint256 nftArrayLength = nftObjectsArray.length;
 
-        lootObject[] memory lootArray = new lootObject[](tokenArrayLength + nftArrayLength);
+        lootObject[] memory lootArray = new lootObject[](
+            tokenArrayLength + nftArrayLength
+        );
 
         // Handle token rewards
         for (uint256 i = 0; i < tokenArrayLength; i++) {
@@ -281,7 +330,14 @@ contract WorldOfBlastDrop is Ownable {
 
         // Handle NFT rewards
         for (uint256 k = 0; k < nftArrayLength; k++) {
-            _handleNFTReward(_address, damage, randomBytes, lootArray, k, tokenArrayLength);
+            _handleNFTReward(
+                _address,
+                damage,
+                randomBytes,
+                lootArray,
+                k,
+                tokenArrayLength
+            );
         }
 
         return abi.encode(lootArray);
@@ -301,7 +357,9 @@ contract WorldOfBlastDrop is Ownable {
         // Initialize reward struct to prevent too deep calls error
         TokenReward memory reward;
         reward.randomValue = uint256(
-            keccak256(abi.encodePacked(block.timestamp, randomBytes, totalResult))
+            keccak256(
+                abi.encodePacked(block.timestamp, randomBytes, totalResult)
+            )
         );
         reward.weightedRandom = reward.randomValue % token.totalWeight;
 
@@ -334,7 +392,12 @@ contract WorldOfBlastDrop is Ownable {
                 idNFT: 0
             });
 
-            emit tokenDrop(_address, token.addr, reward.multiplier, deliveryEarns);
+            emit tokenDrop(
+                _address,
+                token.addr,
+                reward.multiplier,
+                deliveryEarns
+            );
         }
     }
 
@@ -352,14 +415,12 @@ contract WorldOfBlastDrop is Ownable {
         uint256 randomValue = uint256(
             keccak256(abi.encodePacked(block.timestamp, randomBytes, damage))
         );
-        uint256 randomProb = randomValue % 10**18;
+        uint256 randomProb = randomValue % 10 ** 18;
 
         if (randomProb < nft.prob) {
-
             // Ensures there are NFTs
             uint256 balance = nftContract.balanceOf(address(this));
             if (balance > 0) {
-
                 // Choose a random index out of nft.ids.length
                 // IERC721Enumerable annot have knowledge of custom struct fields, so we call nft directly here.
                 uint256 randomIndex = randomValue % nft.ids.length;
@@ -369,11 +430,14 @@ contract WorldOfBlastDrop is Ownable {
 
                 uint256 chosenNFTId = nft.ids[randomIndex];
                 if (chosenNFTId > 0) {
-                    
                     // We set randomIndex index NFT as transfer because it exists. randomIndex contains NFT
-                    nftContract.safeTransferFrom(address(this), _address, chosenNFTId);
+                    nftContract.safeTransferFrom(
+                        address(this),
+                        _address,
+                        chosenNFTId
+                    );
                     // sets as 0
-                    resetNFTIdPosition (index, chosenNFTId);
+                    resetNFTIdPosition(index, chosenNFTId);
 
                     lootArray[index + tokenArrayLength] = lootObject({
                         name: nft.name,
@@ -389,11 +453,10 @@ contract WorldOfBlastDrop is Ownable {
         }
     }
 
-    function withdrawBalance(address _contract, uint256 amount)
-        external
-        onlyOwner
-        returns (bool)
-    {
+    function withdrawBalance(
+        address _contract,
+        uint256 amount
+    ) external onlyOwner returns (bool) {
         IERC20 currentToken = IERC20(_contract);
         return
             currentToken.transfer(
@@ -402,11 +465,10 @@ contract WorldOfBlastDrop is Ownable {
             );
     }
 
-    function withdrawAllNFTs(address _nftContractAddress, address to) 
-        external 
-        onlyOwner 
-        returns (bool) 
-    {
+    function withdrawAllNFTs(
+        address _nftContractAddress,
+        address to
+    ) external onlyOwner returns (bool) {
         IERC721Enumerable nftContract = IERC721Enumerable(_nftContractAddress);
         uint256 balance = nftContract.balanceOf(address(this));
 
@@ -419,7 +481,6 @@ contract WorldOfBlastDrop is Ownable {
 
         return true;
     }
-    
 
     // Blast functions
     function claimAllGas() external onlyOwner {
