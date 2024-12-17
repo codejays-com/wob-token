@@ -58,6 +58,8 @@ contract WorldOfBlastDrop is Ownable {
     uint256 public numberOfNFTContracts;
     uint256 public numberOfTokenContracts;
 
+    uint256 nftDamageThreshold; //minimum damage to start dropping NFT
+
     tokenObject[] private tokenObjectsArray;
     nftObject[] private nftObjectsArray;
 
@@ -329,15 +331,17 @@ contract WorldOfBlastDrop is Ownable {
         }
 
         // Handle NFT rewards
-        for (uint256 k = 0; k < nftArrayLength; k++) {
-            _handleNFTReward(
-                _address,
-                damage,
-                randomBytes,
-                lootArray,
-                k,
-                tokenArrayLength
-            );
+        if (damage >= nftDamageThreshold) {
+            for (uint256 k = 0; k < nftArrayLength; k++) {
+                _handleNFTReward(
+                    _address,
+                    damage,
+                    randomBytes,
+                    lootArray,
+                    k,
+                    tokenArrayLength
+                );
+            }
         }
 
         return abi.encode(lootArray);
@@ -480,6 +484,10 @@ contract WorldOfBlastDrop is Ownable {
         }
 
         return true;
+    }
+
+    function setNftDamageThreshold(uint256 damageThreshold) external onlyOwner {
+        nftDamageThreshold = damageThreshold;
     }
 
     // Blast functions
