@@ -441,7 +441,7 @@ contract WorldOfBlastDrop is Ownable {
                         chosenNFTId
                     );
                     // sets as 0
-                    resetNFTIdPosition(index, chosenNFTId);
+                    resetNFTIdPosition(index, randomIndex);
 
                     lootArray[index + tokenArrayLength] = lootObject({
                         name: nft.name,
