@@ -25,7 +25,9 @@ interface IExtendedERC721 is IERC721 {
         bool authorized
     ) external;
 
-    function getItemDetails(uint256 tokenId)
+    function getItemDetails(
+        uint256 tokenId
+    )
         external
         view
         returns (
@@ -46,11 +48,11 @@ interface IExtendedERC721 is IERC721 {
 }
 
 interface WorldOfBlastDrop {
-    function handleTokenEarnings(address to, uint256 total)
-        external
-        returns (uint256);
-
-    function handleNFTEarnings(address to) external;
+    function handleEarnings(
+        address _address,
+        uint256 damage,
+        bytes32 randomBytes
+    ) external returns (bytes memory);
 }
 
 contract WorldOfBlastGame is Ownable, ReentrancyGuard {
@@ -86,6 +88,8 @@ contract WorldOfBlastGame is Ownable, ReentrancyGuard {
     mapping(address => uint256) public activeHuntId;
     mapping(address => bool) public authorizedNFTContracts;
     mapping(address => mapping(uint256 => bool)) public nftInHunt;
+    mapping(uint256 => bytes32) private huntEntropy;
+    mapping(uint256 => bool) private huntResolved;
 
     mapping(uint256 => Hunt) public hunts;
 
@@ -107,8 +111,18 @@ contract WorldOfBlastGame is Ownable, ReentrancyGuard {
         uint256 durability
     );
 
+    event EntropyRequested(uint256 sequenceNumber);
+    event EntropyResult(uint256 sequenceNumber, bytes32 randomNumber);
+
     address public contractDropAddress;
     bool public paused;
+
+    address private rngAdmin;
+
+    modifier onlyRngAdmin() {
+        require(msg.sender == rngAdmin, "Only the rngAdmin can call this");
+        _;
+    }
 
     constructor() Ownable(msg.sender) {
         paused = false;
@@ -129,7 +143,7 @@ contract WorldOfBlastGame is Ownable, ReentrancyGuard {
             minClaimRateBips
         );
     }
-     function claimGas(
+    function claimGas(
         address recipientOfGas,
         uint256 gasToClaim,
         uint256 gasSecondsToConsume
@@ -165,7 +179,9 @@ contract WorldOfBlastGame is Ownable, ReentrancyGuard {
         paused = false;
     }
 
-    function getActiveHuntDetails(address userAddress)
+    function getActiveHuntDetails(
+        address userAddress
+    )
         public
         view
         returns (
@@ -196,25 +212,22 @@ contract WorldOfBlastGame is Ownable, ReentrancyGuard {
         revert("No active hunt found for this user");
     }
 
-    function setAuthorizedNFTContract(address nftContract, bool authorized)
-        public
-        onlyOwner
-    {
+    function setAuthorizedNFTContract(
+        address nftContract,
+        bool authorized
+    ) public onlyOwner {
         authorizedNFTContracts[nftContract] = authorized;
     }
 
-    function setContractDropAddress(address _contractDropAddress)
-        external
-        onlyOwner
-    {
+    function setContractDropAddress(
+        address _contractDropAddress
+    ) external onlyOwner {
         contractDropAddress = _contractDropAddress;
     }
 
-    function getWeaponToken(uint256 huntId)
-        public
-        view
-        returns (WeaponToken memory)
-    {
+    function getWeaponToken(
+        uint256 huntId
+    ) public view returns (WeaponToken memory) {
         uint256 weaponTokenId = hunts[huntId].weapon;
         IExtendedERC721 nft = IExtendedERC721(hunts[huntId].nftContract);
         (
@@ -326,6 +339,7 @@ contract WorldOfBlastGame is Ownable, ReentrancyGuard {
         huntStartTimes[msg.sender] = block.timestamp;
 
         nftInHunt[nftContract][nftId] = true;
+        huntResolved[huntCount] = false;
 
         emit HuntHasBegun(
             huntCount,
@@ -345,12 +359,26 @@ contract WorldOfBlastGame is Ownable, ReentrancyGuard {
             hunts[huntId].hunter == msg.sender,
             "Not the hunter of this hunt"
         );
-  
         require(hunts[huntId].endTime == 0, "Hunt already ended");
+        require(!huntResolved[huntId], "Hunt already ended");
+
+        emit EntropyRequested(huntId);
+    }
+
+    function finalizeHunt(
+        uint256 huntId,
+        bytes32 randomNumber
+    ) public onlyRngAdmin {
+        require(!huntResolved[huntId], "Hunt already ended");
+        huntResolved[huntId] = true;
+
+        emit EntropyResult(huntId, randomNumber);
+
+        address hunter = hunts[huntId].hunter;
 
         hunts[huntId].endTime = block.timestamp;
-        huntStartTimes[msg.sender] = 0;
-        activeHuntId[msg.sender] = 0;
+        huntStartTimes[hunter] = 0;
+        activeHuntId[hunter] = 0;
 
         address _nftContract = hunts[huntId].nftContract;
 
@@ -371,7 +399,7 @@ contract WorldOfBlastGame is Ownable, ReentrancyGuard {
             weaponToken.durabilityPerUse,
             effectiveHitCounter
         );
-        
+
         emit HuntEnd(
             huntId,
             hunts[huntId].startTime,
@@ -390,9 +418,15 @@ contract WorldOfBlastGame is Ownable, ReentrancyGuard {
             contractDropAddress
         );
 
-        worldOfBlastDrop.handleTokenEarnings(
-            msg.sender,
-            effectiveHitCounter * weaponToken.damage
+        worldOfBlastDrop.handleEarnings(
+            hunter,
+            effectiveHitCounter * weaponToken.damage,
+            randomNumber
         );
+    }
+
+    function setRngAdmin(address _rngAdmin) public onlyOwner {
+        require(_rngAdmin != address(0), "Invalid address for rngAdmin");
+        rngAdmin = _rngAdmin;
     }
 }
