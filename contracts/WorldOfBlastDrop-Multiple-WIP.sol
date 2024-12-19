@@ -490,6 +490,10 @@ contract WorldOfBlastDrop is Ownable {
         nftDamageThreshold = damageThreshold;
     }
 
+    function getNFTDamageThreshold() external view onlyOwner returns (uint256) {
+        return nftDamageThreshold;
+    }
+
     // Blast functions
     function claimAllGas() external onlyOwner {
         BLAST.claimAllGas(address(this), msg.sender);
