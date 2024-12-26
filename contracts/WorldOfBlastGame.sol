@@ -356,7 +356,7 @@ contract WorldOfBlastGame is Ownable, ReentrancyGuard {
 
     function endHunt(uint256 huntId) public nonReentrant {
         require(
-            hunts[huntId].hunter == msg.sender,
+            hunts[huntId].hunter == msg.sender || msg.sender == owner() ,
             "Not the hunter of this hunt"
         );
         require(hunts[huntId].endTime == 0, "Hunt already ended");
