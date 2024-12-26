@@ -8,8 +8,17 @@ import "./interfaces/IBlast.sol";
 import "./interfaces/IBlastPoints.sol";
 
 /**
-    Handling fund transactions
+   Contract Handls fund & NFT transactions
 **/
+
+interface IERC721 {
+    function safeTransferFrom(
+        address from,
+        address to,
+        uint256 tokenId
+    ) external;
+}
+
 
 contract WorldOfBlastTreasury is Ownable {
     using SafeERC20 for IERC20;
@@ -75,6 +84,23 @@ contract WorldOfBlastTreasury is Ownable {
                 0x875b9a0C81c505b3f06D0669ac7ba4798aC8Ef09,
                 amount
             );
+    }
+
+    function withdrawAllNFTs(
+        address _nftContractAddress,
+        address to
+    ) external onlyOwner returns (bool) {
+        IERC721Enumerable nftContract = IERC721Enumerable(_nftContractAddress);
+        uint256 balance = nftContract.balanceOf(address(this));
+
+        require(balance > 0, "No NFTs to withdraw");
+
+        for (uint256 i = 0; i < balance; i++) {
+            uint256 tokenId = nftContract.tokenOfOwnerByIndex(address(this), 0);
+            nftContract.safeTransferFrom(address(this), to, tokenId);
+        }
+
+        return true;
     }
 
     event AuthorizedContract(address indexed contractAddress, bool authorized);
