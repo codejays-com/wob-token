@@ -76,7 +76,7 @@ contract WorldOfBlastDrop is Ownable {
     tokenObject[] private tokenObjectsArray;
     nftObject[] private nftObjectsArray;
 
-    // Able to handle Contracts
+    // Blast Contract
     IBlast public constant BLAST =
         IBlast(0x4300000000000000000000000000000000000002);
 
