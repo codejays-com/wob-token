@@ -86,23 +86,6 @@ contract WorldOfBlastTreasury is Ownable {
             );
     }
 
-    function withdrawAllNFTs(
-        address _nftContractAddress,
-        address to
-    ) external onlyOwner returns (bool) {
-        IERC721Enumerable nftContract = IERC721Enumerable(_nftContractAddress);
-        uint256 balance = nftContract.balanceOf(address(this));
-
-        require(balance > 0, "No NFTs to withdraw");
-
-        for (uint256 i = 0; i < balance; i++) {
-            uint256 tokenId = nftContract.tokenOfOwnerByIndex(address(this), 0);
-            nftContract.safeTransferFrom(address(this), to, tokenId);
-        }
-
-        return true;
-    }
-
     /**
      * @dev Withdraws an NFT from an arbitrary ERC721 contract.
      * @param nftContract The address of the ERC721 contract.
