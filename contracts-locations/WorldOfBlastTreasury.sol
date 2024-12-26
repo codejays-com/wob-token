@@ -103,6 +103,23 @@ contract WorldOfBlastTreasury is Ownable {
         return true;
     }
 
+    /**
+     * @dev Withdraws an NFT from an arbitrary ERC721 contract.
+     * @param nftContract The address of the ERC721 contract.
+     * @param tokenId The ID of the token to withdraw.
+     * @param recipient The address to send the NFT to.
+     */
+    function withdrawNFT(
+        address nftContract,
+        uint256 tokenId,
+        address recipient
+    ) external onlyOwner {
+        require(nftContract != address(0), "Invalid contract address");
+        require(recipient != address(0), "Invalid recipient address");
+
+        IERC721(nftContract).safeTransferFrom(address(this), recipient, tokenId);
+    }
+
     event AuthorizedContract(address indexed contractAddress, bool authorized);
     event FundsTransferred(
         address indexed tokenAddress,
