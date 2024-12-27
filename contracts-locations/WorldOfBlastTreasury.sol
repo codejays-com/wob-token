@@ -22,7 +22,7 @@ interface IERC721 {
 contract WorldOfBlastTreasury is Ownable {
     using SafeERC20 for IERC20;
     address private whitelistAdmin;
-    address[] private pendingAuthorizeContracts;
+    mapping(address => bool) private pendingAuthorizeContracts;
     mapping(address => bool) public authorizedContracts;
 
     // Blast Contract
@@ -52,15 +52,13 @@ contract WorldOfBlastTreasury is Ownable {
             "Contract is already authorized"
         );
 
-        pendingAuthorizeContracts.push(contractAddress);
+        pendingAuthorizeContracts[contractAddress] = true;
     }
 
-    function authorizePendingContracts() public onlyOwner {
-        for (uint256 i = 0; i < pendingAuthorizeContracts.length; i++) {
-            address contractAddress = pendingAuthorizeContracts[i];
-            authorizedContracts[contractAddress] = true;
-        }
-        delete pendingAuthorizeContracts;
+    function authorizePendingContract(address contractAddress) public onlyOwner {
+        authorizedContracts[contractAddress] = true;
+
+        delete pendingAuthorizeContracts[contractAddress];
     }
 
     function removeAuthorizeContract(
