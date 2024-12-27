@@ -22,7 +22,7 @@ interface IERC721Enumerable is IERC721, WorldOfBlastNft {
 }
 
 interface IWorldOfBlastTreasury {
-    function transferFunds(
+    function transferToken(
         address tokenAddress,
         address recipient,
         uint256 amount
@@ -402,7 +402,7 @@ contract WorldOfBlastDrop is Ownable {
             }
 
             // Call the treasury's transfer function instead of directly transferring tokens
-            IWorldOfBlastTreasury(treasuryContractAddress).transferFunds(
+            IWorldOfBlastTreasury(treasuryContractAddress).transferToken(
                 token.addr,
                 _address,
                 deliveryEarns

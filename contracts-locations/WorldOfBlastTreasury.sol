@@ -19,17 +19,17 @@ interface IERC721 {
     ) external;
 }
 
-
 contract WorldOfBlastTreasury is Ownable {
     using SafeERC20 for IERC20;
+    address private whitelistAdmin;
+    address[] private pendingAuthorizeContracts;
     mapping(address => bool) public authorizedContracts;
 
     // Blast Contract
     IBlast public constant BLAST =
         IBlast(0x4300000000000000000000000000000000000002);
 
-    constructor() Ownable(msg.sender) {
-
+    constructor(address _whitelistAdmin) Ownable(msg.sender) {
         IBlastPoints(0x2536FE9ab3F511540F2f9e2eC2A805005C3Dd800)
             .configurePointsOperator(
                 0x4225d96C1d59D935c2b004823C184C4D9caF159e
@@ -37,25 +37,47 @@ contract WorldOfBlastTreasury is Ownable {
 
         BLAST.configureClaimableYield();
         BLAST.configureClaimableGas();
+        whitelistAdmin = _whitelistAdmin;
     }
 
-    function authorizeContract(
-        address contractAddress,
-        bool authorized
-    ) public onlyOwner {
-        authorizedContracts[contractAddress] = authorized;
-        emit AuthorizedContract(contractAddress, authorized);
+    function queuePendingContract(
+        address contractAddress
+    ) public whitelistAdminOnly {
+        require(
+            contractAddress != address(0),
+            "Contract address cannot be the zero address"
+        );
+        require(
+            !authorizedContracts[contractAddress],
+            "Contract is already authorized"
+        );
+
+        pendingAuthorizeContracts.push(contractAddress);
     }
 
-    function withdrawFunds(
-        address tokenAddress,
-        uint256 amount
-    ) public authorizedOnly {
-        IERC20 token = IERC20(tokenAddress);
-        SafeERC20.safeTransfer(token, msg.sender, amount);
+    function authorizePendingContracts() public onlyOwner {
+        for (uint256 i = 0; i < pendingAuthorizeContracts.length; i++) {
+            address contractAddress = pendingAuthorizeContracts[i];
+            authorizedContracts[contractAddress] = true;
+        }
+        delete pendingAuthorizeContracts;
     }
 
-    function transferFunds(
+    function removeAuthorizeContract(
+        address contractAddress
+    ) public whitelistAdminOnly {
+        require(
+            authorizedContracts[contractAddress],
+            "Contract is not authorized"
+        );
+        authorizedContracts[contractAddress] = false;
+    }
+
+    function isAuthorized(address contractAddress) public view returns (bool) {
+        return authorizedContracts[contractAddress];
+    }
+
+    function transferToken(
         address tokenAddress,
         address recipient,
         uint256 amount
@@ -66,41 +88,25 @@ contract WorldOfBlastTreasury is Ownable {
         emit FundsTransferred(tokenAddress, recipient, amount);
     }
 
-    modifier authorizedOnly() {
-        require(
-            authorizedContracts[msg.sender],
-            "Contract is not authorized to withdraw funds"
-        );
-        _;
-    }
-
     function withdrawBalance(
         address _contract,
         uint256 amount
     ) external onlyOwner returns (bool) {
         IERC20 currentToken = IERC20(_contract);
-        return
-            currentToken.transfer(
-                0x875b9a0C81c505b3f06D0669ac7ba4798aC8Ef09,
-                amount
-            );
+        return currentToken.transfer(whitelistAdmin, amount);
     }
 
-    /**
-     * @dev Withdraws an NFT from an arbitrary ERC721 contract.
-     * @param nftContract The address of the ERC721 contract.
-     * @param tokenId The ID of the token to withdraw.
-     * @param recipient The address to send the NFT to.
-     */
     function withdrawNFT(
         address nftContract,
-        uint256 tokenId,
-        address recipient
+        uint256 tokenId
     ) external onlyOwner {
         require(nftContract != address(0), "Invalid contract address");
-        require(recipient != address(0), "Invalid recipient address");
 
-        IERC721(nftContract).safeTransferFrom(address(this), recipient, tokenId);
+        IERC721(nftContract).safeTransferFrom(
+            address(this),
+            whitelistAdmin,
+            tokenId
+        );
     }
 
     event AuthorizedContract(address indexed contractAddress, bool authorized);
@@ -109,6 +115,20 @@ contract WorldOfBlastTreasury is Ownable {
         address indexed recipient,
         uint256 amount
     );
+
+    //Modifiers
+    modifier whitelistAdminOnly() {
+        require(msg.sender == whitelistAdmin, "Not authorized: Whitelist only");
+        _;
+    }
+
+    modifier authorizedOnly() {
+        require(
+            authorizedContracts[msg.sender],
+            "Contract is not authorized to withdraw funds"
+        );
+        _;
+    }
 
     // Blast functions
     function claimAllGas() external onlyOwner {
