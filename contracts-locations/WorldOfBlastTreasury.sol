@@ -55,10 +55,16 @@ contract WorldOfBlastTreasury is Ownable {
         pendingAuthorizeContracts[contractAddress] = true;
     }
 
-    function authorizePendingContract(address contractAddress) public onlyOwner {
-        authorizedContracts[contractAddress] = true;
+    function authorizePendingContract(
+        address contractAddress
+    ) public onlyOwner {
+        require(
+            pendingAuthorizeContracts[contractAddress],
+            "Contract is not pending for authorization"
+        );
 
-        delete pendingAuthorizeContracts[contractAddress];
+        authorizedContracts[contractAddress] = true;
+        pendingAuthorizeContracts[contractAddress] = false;
     }
 
     function removeAuthorizeContract(
