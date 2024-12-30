@@ -26,8 +26,8 @@ contract WorldOfBlastDrop is Ownable {
         address addr; // contract address
         uint256 totalWeight;
         uint256 rate;
-        uint256[12] weights;
-        uint256[12] multipliers;
+        uint256[] weights;
+        uint256[] multipliers;
     }
 
     // handle custom nfts
@@ -35,7 +35,7 @@ contract WorldOfBlastDrop is Ownable {
         string name; // contract Name
         address addr; // contract address
         uint256 prob; // 10^18 = 1
-        uint256[30] ids; // array of 30 ids that can be looted.
+        uint256[] ids; //dynamically allocated
     }
 
     // Prevents too deep call
@@ -55,8 +55,8 @@ contract WorldOfBlastDrop is Ownable {
         uint256 idNFT; // for nfts only, for tokens it is always 0;
     }
 
-    uint256 public numberOfNFTContracts;
     uint256 public numberOfTokenContracts;
+    uint256 public numberOfNFTContracts;
 
     uint256 nftDamageThreshold; //minimum damage to start dropping NFT
 
@@ -67,20 +67,19 @@ contract WorldOfBlastDrop is Ownable {
     IBlast public constant BLAST =
         IBlast(0x4300000000000000000000000000000000000002);
 
-    // Main weapon NFT contract
-    address public CONTRACT_NFT = 0xFB7acDaE5B59e9C3337203830aEC1563316679E6;
-
     // Add a new object to the array
     function addNewToken(
         string memory _name,
         address _addr,
         uint256 _totalWeight,
         uint256 _rate,
-        uint256[12] memory _weights,
-        uint256[12] memory _multipliers
+        uint256[] memory _weights,
+        uint256[] memory _multipliers
     ) external onlyOwner {
-        require(_weights.length <= 12, "Weights exceed max size");
-        require(_multipliers.length <= 12, "Multipliers exceed max size");
+        require(
+            _weights.length == _multipliers.length,
+            "Weights and multipliers length mismatch"
+        );
 
         tokenObject memory newTokenObject = tokenObject({
             name: _name,
@@ -90,26 +89,10 @@ contract WorldOfBlastDrop is Ownable {
             weights: _weights,
             multipliers: _multipliers
         });
+
         tokenObjectsArray.push(newTokenObject);
         emit tokenAdded(_addr, numberOfTokenContracts);
         numberOfTokenContracts = numberOfTokenContracts + 1;
-    }
-
-    function addNewNFT(
-        string memory _name,
-        address _addr,
-        uint256 _prob,
-        uint256[30] memory _ids
-    ) external onlyOwner {
-        nftObject memory newNFTObject = nftObject({
-            name: _name,
-            addr: _addr,
-            prob: _prob,
-            ids: _ids
-        });
-        nftObjectsArray.push(newNFTObject);
-        emit nftAdded(_addr, numberOfNFTContracts);
-        numberOfNFTContracts = numberOfNFTContracts + 1;
     }
 
     // Token Functions
@@ -136,6 +119,21 @@ contract WorldOfBlastDrop is Ownable {
         tokenObjectsArray[index].rate = rate;
     }
 
+    function updateTokenWeightsAndMultipliers(
+        uint256 tokenIndex,
+        uint256[] memory _weights,
+        uint256[] memory _multipliers
+    ) external onlyOwner {
+        require(tokenIndex < tokenObjectsArray.length, "Invalid token index");
+        require(
+            _weights.length == _multipliers.length,
+            "Weights and multipliers length mismatch"
+        );
+
+        tokenObjectsArray[tokenIndex].weights = _weights;
+        tokenObjectsArray[tokenIndex].multipliers = _multipliers;
+    }
+
     function getTokenObject(
         uint256 tokenObjectsArrayId
     )
@@ -147,8 +145,8 @@ contract WorldOfBlastDrop is Ownable {
             address addr,
             uint256 totalWeight,
             uint256 rate,
-            uint256[12] memory weights,
-            uint256[12] memory multipliers
+            uint256[] memory weights,
+            uint256[] memory multipliers
         )
     {
         require(
@@ -182,6 +180,28 @@ contract WorldOfBlastDrop is Ownable {
         numberOfTokenContracts = numberOfTokenContracts - 1;
 
         emit tokenRemoved(_addr, _name);
+    }
+
+    function addNewNFT(
+        string memory _name,
+        address _addr,
+        uint256 _prob,
+        uint256[] memory _ids
+    ) external onlyOwner {
+        nftObject memory newNFTObject = nftObject({
+            name: _name,
+            addr: _addr,
+            prob: _prob,
+            ids: _ids
+        });
+        nftObjectsArray.push(newNFTObject);
+        emit nftAdded(_addr, numberOfNFTContracts);
+        numberOfNFTContracts = numberOfNFTContracts + 1;
+    }
+
+    function addIdToNFT(uint256 index, uint256 id) external onlyOwner {
+        require(index < nftObjectsArray.length, "Index out of bounds");
+        nftObjectsArray[index].ids.push(id);
     }
 
     // NFT Functions
@@ -235,7 +255,7 @@ contract WorldOfBlastDrop is Ownable {
             string memory name,
             address addr,
             uint256 prob,
-            uint256[30] memory ids
+            uint256[] memory ids
         )
     {
         require(
@@ -304,11 +324,6 @@ contract WorldOfBlastDrop is Ownable {
         bool authorized
     ) external onlyAuthorizedContract {
         authorizedToUseContract[contractAddress] = authorized;
-    }
-
-    // sets the weapon NFT address
-    function setContractNFTAddress(address _address) external onlyOwner {
-        CONTRACT_NFT = _address;
     }
 
     // Sends rewards to _address, and handles some random.
